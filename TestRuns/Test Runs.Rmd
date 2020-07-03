@@ -1,0 +1,449 @@
+---
+title: "Test SEIR Model"
+author: "Weihsueh Chiu"
+date: "`r format(Sys.time(), '%F')`"
+---
+
+```{r setup, include=FALSE}
+library(coda)
+library(bayesplot) 
+library(ggplot2)
+library(tidyverse)
+library(reshape2)
+library(here)
+library(covid19us)
+library(jsonlite)
+library(rvest)
+library(data.table)
+library(gridExtra)
+library(GGally)
+library(RCurl)
+knitr::opts_chunk$set(echo = TRUE, dpi = 300 )
+datadir <- "../data"
+functiondir <- "../functions"
+modeldir <- "../model"
+resultsdir <- "."
+statenow <- "TX"
+datezero <- "2019-12-31"
+source(file.path(functiondir,"get_fips_function.R"))
+source(file.path(functiondir,"get_testdata_functions.R"))
+source(file.path(functiondir,"get_reopendata_function.R"))
+source(file.path(functiondir,"make_infile_functions.R"))
+source(file.path(functiondir,"make_diagnostic.R"))
+source(file.path(functiondir,"scenarios_functions.R"))
+```
+
+## Testing data
+
+```{r testing data,message=FALSE,warning=FALSE,fig.height=7,fig.width=7}
+fips_table <- get_fips(datadir = datadir)
+reopen.df <- get_reopendata(datadir=datadir)
+alldat.df <- get_testdata(mindate = "2020-03-17")
+
+reopen.df <- get_reopendata(datadir = datadir)
+alldat.df$valueperM <- alldat.df$value*1e6/
+  fips_table[alldat.df$state,"pop"]
+allcumdat.df <- get_cumul_testdata(mindate = "2020-03-17")
+allcumdat.df$valueperM <- allcumdat.df$value*1e6/
+  fips_table[allcumdat.df$state,"pop"]
+dat.df <- subset(alldat.df,state==statenow)
+cumdat.df <- subset(allcumdat.df,state==statenow)
+
+ggplot(dat.df)+geom_point(aes(x=numDate,y=value,color=variable))+
+  scale_y_log10()+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=subset(reopen.df,State.Abbr==statenow))+
+  ggtitle(paste(statenow,"Daily"))
+
+ggplot(cumdat.df)+geom_point(aes(x=numDate,y=value,color=variable))+
+  scale_y_log10()+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=subset(reopen.df,State.Abbr==statenow))+
+  ggtitle(paste(statenow,"Cumulative"))
+  
+reopen.df$state <- reopen.df$State.Abbr
+ggplot(alldat.df)+geom_point(aes(x=numDate,y=value,color=variable))+
+  scale_y_log10()+facet_wrap(~state)+
+  xlim(range(alldat.df$numDate))+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=reopen.df)+
+  ggtitle("Daily")
+ggplot(allcumdat.df)+geom_point(aes(x=numDate,y=value,color=variable))+
+  scale_y_log10()+facet_wrap(~state)+
+  xlim(range(alldat.df$numDate))+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=reopen.df)+
+  ggtitle("Cumulative")
+
+ggplot(alldat.df)+geom_point(aes(x=numDate,y=valueperM,color=variable))+
+  xlim(range(alldat.df$numDate))+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=reopen.df)+
+  scale_y_log10()+facet_wrap(~state)+
+  ggtitle("Daily")
+ggplot(allcumdat.df)+geom_point(aes(x=numDate,y=valueperM,color=variable))+
+  xlim(range(alldat.df$numDate))+
+  geom_vline(aes(linetype=ReopenType,xintercept=numDate),
+             data=reopen.df)+
+  scale_y_log10()+facet_wrap(~state)+
+  ggtitle("Cumulative")
+```
+
+## MCSim simulation
+
+Set up MCSim file.
+
+```{r mcsim}
+mdir <- "../MCSim"
+source(file.path(mdir,"setup_MCSim.R"))
+# Make mod.exe (used to create mcsim executable from model file)
+makemod(mdir) 
+model_file<- "SEIR.reopen.model.R"
+exe_file<-makemcsim(model_file,modeldir=modeldir,mdir="../MCSim")
+```
+
+## Deterministic Model
+
+Start time = 60.  Texas population.
+
+```{r determ model file,fig.height=5,fig.width=5}
+set.seed(314159)
+in_file <- "SEIR_Testing.in.R" 
+out_dat <- mcsim(exe_file = exe_file,
+                        in_file = in_file,
+                 resultsdir = resultsdir)
+out_dat <- data.table(out_dat)
+states_S.df <- melt(out_dat[,c("Time","S","S_C","Tot")],id.vars=1)
+ggplot(states_S.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+states_E.df <- melt(out_dat[,c("Time","E","E_C")],id.vars=1)
+ggplot(states_E.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+states_I.df <- melt(out_dat[,c("Time","I_U","I_C","I_T")],id.vars=1)
+ggplot(states_I.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+states_R.df <- melt(out_dat[,c("Time","R_U","R_T","F_T")],id.vars=1)
+ggplot(states_R.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+totals.df <- melt(out_dat[,c("Time","CumInfected", "CumPosTest", "CumDeath")],id.vars=1)
+ggplot(totals.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+timedep.df <- melt(out_dat[,c("Time","ThetaFit","HygieneFit","FTraced", "lambda", "lambda_C", "rho_C", "delta", "c", "beta","Rt","Refft")],id.vars=1)
+ggplot(timedep.df,aes(x=Time,y=value,color=variable))+geom_line() +facet_wrap(~variable,scales="free_y")+theme(legend.position = "none")
+
+const.df <- melt(out_dat[,c("Time","NInit", "TIsolation", "R0", "c0", "TLatent", "TRecover", "IFR", "TStartTesting", "TauTesting", "TTestingRate", "TContactsTestingRate", "TestingCoverage", "TestSensitivity", "ThetaMin", "TauTheta", "PwrTheta", "HygienePwr", "FTraced0", "TPosTest", "TFatalDeath", "alpha", "kappa", "rho", "lambda0", "lambda0_C", "rho0_C","beta0")],id.vars=1)
+ggplot(const.df,aes(x=Time,y=value,color=variable))+geom_line()+scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
+
+out_dat.tmp<-out_dat[,c("Time","N_pos","D_pos")]
+names(out_dat.tmp)<-c("Time","positiveIncrease","deathIncrease")
+obs.df <- melt(out_dat.tmp,id.vars=1)
+ggplot(obs.df,aes(x=Time,y=value,color=variable))+geom_line() + 
+  scale_y_log10(limits=c(1,NA)) +
+  geom_point(data=dat.df,aes(x=numDate,y=value,color=variable))
+
+```
+## Monte Carlo test 
+
+Counts how many integration failures occur using 5000 random parameter sets.
+
+```{r test monte carlo,fig.height=5,fig.width=5,message=FALSE,warning=FALSE}
+# Without integration
+in_file0 <- "SEIR_Testing_MTC0.in.R" 
+out_dat0 <- mcsim(exe_file = exe_file,
+                        in_file = in_file0,
+                  out_file = file.path(resultsdir,"simMTC0.out"),
+                 resultsdir = resultsdir,ignore.stdout = FALSE)
+out_dat0 <- fread(file.path(resultsdir,"simMTC0.out"),select=1:25)
+# out_mtc0.df <- melt(out_dat0,id.vars=1)
+# out_mtc0.df$dointeg <- FALSE
+
+# With integration
+in_file <- "SEIR_Testing_MTC.in.R" 
+out_dat <- mcsim(exe_file = exe_file,
+                        in_file = in_file,
+                  out_file = file.path(resultsdir,"simMTC.out"),
+                 resultsdir = resultsdir,ignore.stdout = FALSE)
+out_dat <- fread(file.path(resultsdir,"simMTC.out"),select=1:25)
+
+# ggpairs(log10(out_dat[,2:17]),
+#         lower = list(continuous = wrap("points", size=0.2,alpha=0.4)),
+#         title="Succeeded integration"
+#         )
+
+integdat<-setdiff(out_dat0,out_dat)
+# ggpairs(log10(integdat[,2:17]),
+#         lower = list(continuous = wrap("points", size=0.2,alpha=0.4)),
+#         title="Failed integration"
+#         )
+nfail <- nrow(integdat)
+print(nfail)
+if (nfail > 50) {
+  integdat$integ <- TRUE
+  tmp <- out_dat
+  tmp$integ <- FALSE
+  all_mtc <- rbind(integdat,tmp)
+  
+  all_mtc[,2:22]<-log10(all_mtc[,2:22])
+  ggpairs(all_mtc[,2:23],
+          mapping = ggplot2::aes(color = integ,alpha=integ),
+          lower = list(continuous = wrap("points", size=0.2))
+          )
+}
+system(paste("rm",file.path(resultsdir,"simMTC.out")))
+```
+## Test run using generic prior (used in validation runs)
+
+```{r test mcmc validation,fig.height=4,fig.width=4}
+
+resultsdir <- "TX.val"
+fips_table <- get_fips(datadir = datadir)
+dat.df <- get_testdata()
+cumdat.df <- get_cumul_testdata()
+burnin <- 0.1
+datadatemax <- "2020-04-30"
+priorfile<-"SEIR.reopen_priors_MCMC.in.R"
+statenow <- "TX"
+popnow <- fips_table$pop[fips_table$Alpha.code==statenow]
+prior_template <- make_infile_template(dat.df,
+                                      fips_table,
+                                      state_abbr=statenow,
+                                      usestatename = TRUE,
+                                      createdir = TRUE,
+                                      pathdir = resultsdir,
+                                      priordir = "../priors",
+                                      priorfile = gsub("MCMC","MTC",priorfile),
+                                      usemobility = FALSE,
+                                      mobilitydir = "../MobilityMetrics",
+                                      isprior = TRUE
+)
+prior_dat <- mcsim(exe_file = exe_file,
+                      in_file = prior_template,
+                 out_file = file.path(resultsdir,gsub(".in.R",".out",prior_template)),
+               resultsdir = resultsdir)
+  infile_template <- make_infile_template(dat.df,
+                                        fips_table,
+                                        state_abbr=statenow,
+                                        usestatename = TRUE,
+                                        createdir = TRUE,
+                                        pathdir = resultsdir,
+                                        X_iter = "2000",
+                                        X_print = "10",
+                                        priordir = "../priors",
+                                        priorfile = priorfile,
+                                        datadatemax=datadatemax,
+                                        usemobility = FALSE,
+                                        mobilitydir = "../MobilityMetrics")
+  set.seed(exp(2))
+  out_dat <- mcsim(exe_file = exe_file,
+                          in_file = infile_template,
+                   resultsdir = resultsdir)#,ignore.stdout = TRUE)
+  
+  make_diagnostic(out_dat, subset(dat.df,state==statenow), 
+                  subset(cumdat.df,state==statenow), burnin=0.1,
+                  pdfname=file.path(resultsdir,
+                                    paste0("Test.Validation.",
+                                           statenow,".pdf")))
+```
+
+## Test run using state-specific priors (used for prediction runs)
+
+```{r test mcmc,fig.height=4,fig.width=4}
+statenow <- "TX"
+resultsdir <- "TX.pred"
+fips_table <- get_fips(datadir = datadir)
+dat.df <- get_testdata()
+cumdat.df <- get_cumul_testdata()
+burnin <- 0.1
+popnow <- fips_table$pop[fips_table$Alpha.code==statenow]
+priorfile<-"SEIR.reopen_state_priors_MCMC.in.R"
+prior_template <- make_infile_template(dat.df,
+                                        fips_table,
+                                        state_abbr=statenow,
+                                        usestatename = TRUE,
+                                        createdir = TRUE,
+                                        pathdir = resultsdir,
+                                        priordir = "../priors",
+                                        priorfile = gsub("MCMC","MTC",priorfile),
+                                        usemobility = TRUE,
+                                        mobilitydir = "../MobilityMetrics",
+                                        isprior = TRUE
+)
+set.seed(exp(1))
+prior_dat <- mcsim(exe_file = exe_file,
+                        in_file = prior_template,
+                   out_file = file.path(resultsdir,gsub(".in.R",".out",prior_template)),
+                 resultsdir = resultsdir)
+infile_template <- make_infile_template(dat.df,
+                                        fips_table,
+                                        state_abbr=statenow,
+                                        usestatename = TRUE,
+                                        createdir = TRUE,
+                                        pathdir = resultsdir,
+                                        X_iter = "2000",
+                                        X_print = "10",
+                                        priordir = "../priors",
+                                        priorfile = priorfile,
+                                        datadatemax = "2020-06-20",
+                                        usemobility = TRUE,
+                                        mobilitydir = "../MobilityMetrics")
+set.seed(exp(1))
+out_dat <- mcsim(exe_file = exe_file,
+                        in_file = infile_template,
+                 resultsdir = resultsdir)#,ignore.stdout = TRUE)
+
+make_diagnostic(out_dat, subset(dat.df,state==statenow), 
+                subset(cumdat.df,state==statenow), burnin=0.1,
+                pdfname=file.path(resultsdir,
+                                  paste0("Test.Prediction.",statenow,".pdf")))
+```
+
+
+```{r short 4 chain MCMC runs test}
+statenow <- "TX"
+resultsdir <- "TX"
+fips_table <- get_fips(datadir = datadir)
+dat.df <- get_testdata()
+cumdat.df <- get_cumul_testdata()
+write.csv(fips_table,
+          file=file.path("FIPS_TABLE.csv"),
+          row.names = FALSE)
+write.csv(dat.df,
+          file.path("DAILYTESTDATA.csv"),
+          row.names = FALSE)
+write.csv(cumdat.df,
+          file.path("CUMULTESTDATA.csv"),row.names = FALSE)
+burnin <- 0.1
+popnow <- fips_table$pop[fips_table$Alpha.code==statenow]
+priorfile<-"SEIR.reopen_state_priors_MCMC.in.R"
+prior_template <- make_infile_template(dat.df,
+                                        fips_table,
+                                        state_abbr=statenow,
+                                        usestatename = TRUE,
+                                        createdir = TRUE,
+                                        pathdir = resultsdir,
+                                        priordir = "../priors",
+                                        priorfile = gsub("MCMC","MTC",priorfile),
+                                        usemobility = TRUE,
+                                        mobilitydir = "../MobilityMetrics",
+                                        isprior = TRUE
+)
+set.seed(exp(1))
+prior_dat <- mcsim(exe_file = exe_file,
+                        in_file = prior_template,
+                   out_file = file.path(resultsdir,gsub(".in.R",".out",prior_template)),
+                 resultsdir = resultsdir)
+infile_template <- make_infile_template(dat.df,
+                                        fips_table,
+                                        state_abbr=statenow,
+                                        usestatename = TRUE,
+                                        createdir = TRUE,
+                                        pathdir = resultsdir,
+                                        X_iter = "2000",
+                                        X_print = "10",
+                                        priordir = "../priors",
+                                        priorfile = priorfile,
+                                        datadatemax = "2020-06-20",
+                                        usemobility = TRUE,
+                                        mobilitydir = "../MobilityMetrics")
+make_infiles(infile_template,
+               exe_file=exe_file,
+               chains=1:4,
+               useposterior=useposterior,
+               resultsdir=resultsdir,
+               randomseed=exp(1))
+
+for (chainnum in 1:4) {
+  out_dat <- mcsim(exe_file = exe_file,
+                          in_file = infile_template,
+                   chainnum = chainnum,
+                   resultsdir = resultsdir)#,ignore.stdout = TRUE)
+}
+
+
+
+```
+
+```{r analysis of test runs}
+system(paste("cp",file.path(functiondir,
+                            "plot_parameter_results.R"),
+             resultsdir))
+system(paste("cp",file.path(functiondir,
+                            "run_batch_rhat_multicheck.R"),
+             resultsdir))
+system(paste("cp",file.path(modeldir,basename(exe_file)),
+             file.path(resultsdir,
+                       gsub(".exe","",basename(exe_file)))))
+wd <- getwd()
+setwd(resultsdir)
+source("plot_parameter_results.R")
+source("run_batch_rhat_multicheck.R")
+setwd(wd)
+```
+
+```{r test scenarios}
+datadatemax <- "2020-06-20"
+folder<-"."
+fips_table <- read.csv("FIPS_TABLE.csv",colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+statenow <- "TX"
+scen_model_file<- "SEIR.scenarios.model.R"
+scen_exe_file<-makemcsim(scen_model_file,modeldir=modeldir,mdir="../MCSim")
+
+output <- run_setpoints1(fips_table,
+                           state_abbr=statenow,
+                           TPrint=datadatemax,
+                           pathdir=folder,
+                           scenariosdir = "../scenarios",
+                           scenariostemplate=
+                             "SEIR.reopen_state_setpoints1_MCMC.in.R",
+                           scenarioname = "OneTime",
+                           nruns = 0,
+                           keepoutfile = TRUE,
+                         exe_file=scen_exe_file)
+
+scen.df <- data.frame(state=sort(rep(statenow,12)),
+                      mu_C = rep(rep(c(1,1,2,2),3),length(statenow)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statenow)),
+                      DeltaDelta = rep(c(rep(0,4),rep(0.25,4),rep(-0.25,4)),length(statenow)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, ",
+                               ifelse(sign(scen.df$DeltaDelta)==1,
+                                      paste0("+",100*scen.df$DeltaDelta,"%"),
+                                      ifelse(sign(scen.df$DeltaDelta)== -1,
+                                      paste0(100*scen.df$DeltaDelta,"%"),
+                                      ifelse(sign(scen.df$DeltaDelta)==0,
+                                      "Current",""
+                                      )))," Reopening")
+pdf(file=file.path(folder,statenow,
+                   "Scenarios_TestRuns.pdf"),height=4,width=6)
+for (j in 1:nrow(scen.df)) {
+  scenrow<-scen.df[j,]
+  output <- run_setpoints(fips_table,
+                           state_abbr=scenrow$state,
+                           pathdir=folder,
+                          scenariosdir="../scenarios",
+                           scenariostemplate=
+                             "SEIR.reopen_state_setpoints_MCMC.in.R",
+                           scenarioname = scenrow$scenarioname,
+                           nruns = 0,
+                          mu_C = scenrow$mu_C,
+                          mu_Lambda = scenrow$mu_Lambda,
+                           DeltaDelta = scenrow$DeltaDelta,
+                          rampuptime=14,
+                           keepoutfile = FALSE,
+                         exe_file=scen_exe_file)
+  plot_scenario(alldat.df, output$out_quant,scenrow$state,
+                logy=FALSE,
+                scenarioname = scenrow$scenariodesc)
+}
+dev.off()
+```
+```{r echo=FALSE}
+devtools::session_info()
+```
+
