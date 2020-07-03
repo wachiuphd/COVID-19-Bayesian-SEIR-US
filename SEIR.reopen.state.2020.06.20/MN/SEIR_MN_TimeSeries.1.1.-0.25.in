@@ -1,0 +1,64 @@
+SetPoints ("SEIR.reopen.state.alt2.2020.06.20/MN/SEIR_MN_TimeSeries.1.1.-0.25.out", "SEIR.reopen.state.alt2.2020.06.20/MN/SEIR_MN_MCMC1234.samps.out", 
+          0, 
+          GM_NInit, # Initial number of infected at Start Time
+          GM_TIsolation, # Isolation time after contact tracing
+          GM_R0, # Reproduction number
+          GM_c0, # Contacts/day
+          GM_TLatent, # Latency period
+          GM_TRecover, # Time to recovery (no longer infectious)
+          GM_IFR, # Infected fatality rate
+          GM_TStartTesting, # Time of start of testing
+          GM_TauTesting, # Time constant for testing
+          GM_TTestingRate, # 1/rate of testing
+          GM_TContactsTestingRate, # 1/rate of testing for contacts
+          GM_TestingCoverage, # Coverage of testing
+          GM_TestSensitivity, # True positive rate
+          GM_ThetaMin, # Minimum value for social distancing
+          GM_TauTheta, # Characteristic time for social distancing
+          GM_PwrTheta, # Power in Weibull model for social distancing
+          GM_HygienePwr, # Relative impact of Hygiene vs. social distancing
+          GM_FracTraced, # Fraction traced 
+          GM_TPosTest, # Reporting delay
+          GM_TFatalDeath, # Delay time for deaths
+          GM_TauS, # Days after TauTheta that Reopening starts
+          GM_rMax, # Max reopen (1 = contacts/day back to baseline)
+          GM_TauR # Days after TauS that max reopening occurs
+          );
+
+Integrate (Lsodes, 1e-8, 1e-10, 1);
+
+# Printing setpoints results for a time series
+
+Simulation { # MN
+  
+  Npop = 5639632 ;
+  StartTime(60);
+  
+  MuLambda = NDoses( 16 ,
+                     -1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+                     0 , 183 , 184 , 185 , 186 , 187 , 188 , 189 , 190 , 191 , 192 , 193 , 194 , 195 , 196 , 197 );
+  
+  MuC = NDoses( 16 ,
+                -1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+                0 , 183 , 184 , 185 , 186 , 187 , 188 , 189 , 190 , 191 , 192 , 193 , 194 , 195 , 196 , 197 );
+  
+  DeltaDelta = NDoses( 16 ,
+                       -1 , 0 , -0.0178571428571429 , -0.0357142857142857 , -0.0535714285714286 , -0.0714285714285714 , -0.0892857142857143 , -0.107142857142857 , -0.125 , -0.142857142857143 , -0.160714285714286 , -0.178571428571429 , -0.196428571428571 , -0.214285714285714 , -0.232142857142857 , -0.25 ,
+                       0 , 183 , 184 , 185 , 186 , 187 , 188 , 189 , 190 , 191 , 192 , 193 , 194 , 195 , 196 , 197 );
+
+  # Key Fixed Parameters
+  # Print(alpha, kappa, rho, lambda0, lambda0_C, rho0_C, beta0, 244);
+  # Print(TauTheta, TauS, rMax, TauR, 244);
+  # 
+  # # State Variables
+  # PrintStep( S, S_C, E, E_C, I_U,I_C,I_T, R_U,R_T,F_T, 60, 244, 1);
+  # 
+  # # Key Time-Varying Parameters
+  # PrintStep( ThetaFit, HygieneFit, FTraced, lambda, lambda_C, rho_C, delta, c, beta, 60, 244, 1);
+  # PrintStep( Rt, Refft, 60, 244, 1);
+
+  # Observables (daily and cumulative)
+  PrintStep( N_pos, D_pos, CumPosTest, CumDeath, 60, 244, 1);
+  PrintStep( FTraced, lambda, Rt, Refft, 60, 244, 1);
+  
+}

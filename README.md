@@ -132,10 +132,13 @@ model - model definition files (compiled by MCSim to create executable files)
 priors - prior distribution templates
 scenarios - scenario templates
 TestRuns - demonstration files
+Figures - 
 
 ## Mobility Data Fits
 
 Analysis of mobility data is contained in the "MobilityMetrics" directory.  Mobility data were used to generate state-specific prior distributions for social distancing time-dependence. All analyses are in the "Mobility Fits.Rmd" R markdown file.  Run each "chunk" and it will generate the results in the generated csv files and summary in the Word "docx" file.  Note that these were run on 2020-06-20, so unless the Sys.Date is changed to that date, the results will be include mobility data since that date in the analysis.
+
+Note that Supplementary Figure 1 is "MobilityFitExample.pdf" and Supplementary Figure 2 is "Mobility.pdf".
 
 ## Demonstration Test Runs
 
@@ -187,3 +190,5 @@ To generate the input files for validation, run the script "setup_batch_validati
 Because these were meant to be run on a cluster (named "ada"), a tgz archive is also created so it can be uploaded to a cluster.  Once on the cluster, the model file is compiled for that platform, and then a shell script "SEIR_run_all.sh" is run to submit all the jobfiles to the cluster.  
 
 After the runs are complete, then tgz archives of all the ".csv" and "samps.out" files are created and downloaded from the cluster for analysis.  In the repository, all results files have been uploaded already.
+
+All the Figures and Supplemental Figures except for the Mobility-related ones are generated using markdown file in the Figures.Rmd file in the Figures directory.
