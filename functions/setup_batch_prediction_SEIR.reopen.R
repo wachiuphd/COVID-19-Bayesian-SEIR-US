@@ -101,7 +101,7 @@ if (!file.exists(file.path(batchdir,model_file))) {
 }
 ###################
 # Run priors
-resultsdir <- "TestRuns.SEIR.reopen"
+resultsdir <- "TestRuns"
 out_file0 <- file.path(resultsdir,"simMTC0.out")
 if (!file.exists(out_file0)) {
   set.seed(exp(1))

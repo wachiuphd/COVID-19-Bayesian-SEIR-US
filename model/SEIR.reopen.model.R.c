@@ -1,11 +1,11 @@
-/* ../model/SEIR.reopen.model.R.c
+/* model/SEIR.reopen.model.R.c
    ___________________________________________________
 
-   Model File:  ../model/SEIR.reopen.model.R
+   Model File:  model/SEIR.reopen.model.R
 
-   Date:  Fri Jul  3 15:49:02 2020
+   Date:  Fri Jul  3 16:13:14 2020
 
-   Created by:  "../MCSim/mod.exe v6.1.0"
+   Created by:  "MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
    ___________________________________________________
 
@@ -317,9 +317,9 @@
 /*----- Global Variables */
 
 /* For export. Keep track of who we are. */
-char szModelDescFilename[] = "../model/SEIR.reopen.model.R";
+char szModelDescFilename[] = "model/SEIR.reopen.model.R";
 char szModelSourceFilename[] = __FILE__;
-char szModelGenAndVersion[] = "../MCSim/mod.exe v6.1.0";
+char szModelGenAndVersion[] = "MCSim/mod.exe v6.1.0";
 
 /* Externs */
 extern BOOL vbModelReinitd;
