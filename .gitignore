@@ -41,3 +41,4 @@ vignettes/*.pdf
 # Mac
 .DS*
 .DS_Store
+TestRuns/TX/SEIR_TX_MCMC1234.samps.check.out
