@@ -185,10 +185,14 @@ Finally, a demonstration of the different scenarios is run.  First, outputs at a
 
 ## Instructions for use
 
-To generate the input files for validation, run the script "setup_batch_validation_SEIR.reopen.R", which will create a directory "SEIR.reopen.2020.04.30".  Similarly, generate the input files for validation, run the script "setup_batch_predictionn_SEIR.reopen.R", which will create a directory "SEIR.reopen.state.2020.06.20".  In both cases, each state has its own directory, and a shell script ".jobfile" that runs the analyses.  
+To generate the input files for validation, run the script "setup_batch_validation_SEIR.reopen.R", which will create a directory "SEIR.reopen.2020.04.30".  Similarly, generate the input files for validation, run the script "setup_batch_predictionn_SEIR.reopen.R", which will create a dire ctory "SEIR.reopen.state.2020.06.20".  In both cases, each state has its own directory, and a shell script ".jobfile" that runs the analyses.  
 
 Because these were meant to be run on a cluster (named "ada"), a tgz archive is also created so it can be uploaded to a cluster.  Once on the cluster, the model file is compiled for that platform, and then a shell script "SEIR_run_all.sh" is run to submit all the jobfiles to the cluster.  
 
 After the runs are complete, then tgz archives of all the ".csv" and "samps.out" files are created and downloaded from the cluster for analysis.  In the repository, all results files have been uploaded already.
 
-All the Figures and Supplemental Figures except for the Mobility-related ones are generated using markdown file in the Figures.Rmd file in the Figures directory.
+To generate Supplemental Figure S4, the function "run_plot_validation_scenario.R"
+
+To run the scenarios, and generated Supplemental Figure S10, the function "run_plot_scenarios.R" should be sourced.
+
+All other Figures and Supplemental Figures are generated using markdown file in the Figures.Rmd file in the Figures directory.
