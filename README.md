@@ -191,8 +191,8 @@ Because these were on a cluster (named "ada" - hence the template file in "funct
 
 After the runs are complete, then tgz archives of all the ".csv" and "samps.out" files are created and downloaded from the cluster for analysis.  In the repository, all results files have been uploaded already.
 
-To generate Supplemental Figure S4, the function "run_plot_validation_scenario.R"
+To generate Supplemental Figure S4, the function "run_plot_validation_scenario.R" should be sourced.
 
 To run the scenarios, and generated Supplemental Figure S10, the function "run_plot_scenarios.R" should be sourced.
 
-All other Figures and Supplemental Figures are generated using markdown file in the Figures.Rmd file in the Figures directory.
+All other Figures and Supplemental Figures are generated using markdown file in the Figures.Rmd file in the Figures directory.  Note that Figures 1 and 5 are composites created in Powerpoint, and the Figure files created here are imported to Powerpoint to create them.
