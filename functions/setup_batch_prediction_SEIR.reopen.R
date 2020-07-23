@@ -81,18 +81,32 @@ make_jobfile <- function(state_abbr="TX",
   return(jobfilename)
 }
 
-## Prediction - Run through 6/20 with re-opening - state-specific priors
+# ## Prediction - Run through 6/20 with re-opening - state-specific priors
+# statenow <- "ALL"
+# restartdir<-""
+# useposterior <- FALSE
+# batchdir <- "SEIR.reopen.state.2020.06.20"
+# priorfile <- "SEIR.reopen_state_priors_MCMC.in.R"
+# X_iter <- "200000"
+# X_print <- "100"
+# domulticheck <- TRUE
+# valid <- TRUE
+# validdate <- "2020-06-20"
+# usemobility <- TRUE
+
+## Prediction - Run through 7/22 with re-opening - state-specific priors
 statenow <- "ALL"
 restartdir<-""
 useposterior <- FALSE
-batchdir <- "SEIR.reopen.state.2020.06.20"
+batchdir <- "SEIR.reopen.state.2020.07.22"
 priorfile <- "SEIR.reopen_state_priors_MCMC.in.R"
 X_iter <- "200000"
 X_print <- "100"
 domulticheck <- TRUE
 valid <- TRUE
-validdate <- "2020-06-20"
+validdate <- "2020-07-22"
 usemobility <- TRUE
+mobilityfile <- "MobilityParmsSummaryByState-2020-07-21.csv"
 ###################
 if (!dir.exists(batchdir)) system(paste("mkdir",batchdir))
 # Model file
@@ -171,6 +185,7 @@ for (statenow in statevec) {
                                          priorfile = gsub("MCMC","MTC",priorfile),
                                          usemobility = usemobility,
                                          mobilitydir = "MobilityMetrics",
+                                         mobilityfile = mobilityfile,
                                          isprior = TRUE
   )
   set.seed(exp(1))
@@ -202,7 +217,8 @@ for (statenow in statevec) {
                                           datadatemax=datadatemax,
                                           priorfile = priorfile,
                                           usemobility = usemobility,
-                                          mobilitydir = "MobilityMetrics"
+                                          mobilitydir = "MobilityMetrics",
+                                          mobilityfile = mobilityfile
   )
   make_infiles(infile_template,
                restartdir = restartdir,

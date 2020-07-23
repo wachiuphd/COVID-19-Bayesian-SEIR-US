@@ -51,6 +51,8 @@ for (j in 1:nrow(scen.df)) {
                            keepoutfile = FALSE,
                           exe_file = exe_file)
   pred.df <- subset(output$out_dat.df,Output_Var %in% c("alpha_Pos","alpha_Death","N_pos","D_pos"))
+  pred.df$Output_Var[pred.df$Output_Var=="N_pos"]<-"Reported Cases"
+  pred.df$Output_Var[pred.df$Output_Var=="D_pos"]<-"Confirmed Deaths"
   obspred.df <- data.frame()
   set.seed(3.1415927)
   for (i in unique(pred.df$Iter)) {
@@ -60,12 +62,12 @@ for (j in 1:nrow(scen.df)) {
     alpha_Pos <- subset(predtmp,Output_Var=="alpha_Pos")$Prediction
     alpha_Death <- subset(predtmp,Output_Var=="alpha_Death")$Prediction
     obspredtmp1 <- subset(dat.df,Output_Var=="positiveIncrease")
-    obspredtmp1$Output_Var <- as.character("N_pos")
+    obspredtmp1$Output_Var <- as.character("Reported Cases")
     obspredtmp1 <- merge(obspredtmp1,predtmp)
     obspredtmp1$RandPred <- rnbinom(nrow(obspredtmp1),alpha_Pos,
                                     alpha_Pos/(alpha_Pos+obspredtmp1$Prediction))
     obspredtmp2 <- subset(dat.df,Output_Var=="deathIncrease")
-    obspredtmp2$Output_Var <- as.character("D_pos")
+    obspredtmp2$Output_Var <- as.character("Confirmed Deaths")
     obspredtmp2 <- merge(obspredtmp2,predtmp)
     obspredtmp2$RandPred <- rnbinom(nrow(obspredtmp2),alpha_Death,
                                     alpha_Death/(alpha_Death+obspredtmp2$Prediction))
@@ -78,31 +80,32 @@ for (j in 1:nrow(scen.df)) {
                                           obspred.df,
                                           quantile,prob=c(0.025,0.05,0.1,0.25,0.5,0.75,0.90,0.95,0.975)))
   obspred.quant$p95 <- (obspred.quant$value >= obspred.quant$RandPred.2.5.) & (obspred.quant$value <= obspred.quant$RandPred.97.5.)
-  obspred.quant$training <- "Prediction"
-  obspred.quant$training[obspred.quant$date <= as.Date("2020-06-20")] <- "Prediction"
-  p95.cases.train <- subset(obspred.quant,date <= as.Date("2020-06-20") & Output_Var=="N_pos")
+  obspred.quant$training <- "Validation"
+  obspred.quant$training[obspred.quant$date <= as.Date("2020-06-20")] <- "Calibration"
+  p95.cases.train <- subset(obspred.quant,date <= as.Date("2020-06-20") & Output_Var=="Reported Cases")
   scenrow$p95.cases.train <- sum(p95.cases.train$p95)/nrow(p95.cases.train)
-  p95.deaths.train <- subset(obspred.quant,date <= as.Date("2020-06-20") & Output_Var=="D_pos")
+  p95.deaths.train <- subset(obspred.quant,date <= as.Date("2020-06-20") & Output_Var=="Confirmed Deaths")
   scenrow$p95.deaths.train <- sum(p95.deaths.train$p95)/nrow(p95.deaths.train)
-  p95.cases.valid <- subset(obspred.quant,date > as.Date("2020-06-20") & date <= as.Date("2020-07-22") & Output_Var=="N_pos")
+  p95.cases.valid <- subset(obspred.quant,date > as.Date("2020-06-20") & date <= as.Date("2020-07-22") & Output_Var=="Reported Cases")
   scenrow$p95.cases.valid <- sum(p95.cases.valid$p95)/nrow(p95.cases.valid)
-  p95.deaths.valid <- subset(obspred.quant,date > as.Date("2020-06-20") & date <= as.Date("2020-07-22") & Output_Var=="D_pos")
+  p95.deaths.valid <- subset(obspred.quant,date > as.Date("2020-06-20") & date <= as.Date("2020-07-22") & Output_Var=="Confirmed Deaths")
   scenrow$p95.deaths.valid <- sum(p95.deaths.valid$p95)/nrow(p95.deaths.valid)
   plt<-ggplot(obspred.quant)+
     geom_col(aes(x=date,y=value,fill=training))+
-    geom_ribbon(aes(x=date,ymin=RandPred.2.5.,ymax=RandPred.97.5.),alpha=0.4)+
+    geom_ribbon(aes(x=date,ymin=RandPred.2.5.,ymax=RandPred.97.5.,fill="CrI+Dispersion"),alpha=0.4)+
     geom_ribbon(aes(x=date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,fill="CrI"),alpha=0.4,
                 data=obspred.pred.quant)+
     geom_ribbon(aes(x=date,ymin=Prediction.25.,ymax=Prediction.75.,fill="IQR"),alpha=0.4,
                 data=obspred.pred.quant)+
     facet_wrap(~Output_Var,scales="free")+
-    ggtitle(paste(scenrow$state,"Coverage\nTraining:",
-                  signif(scenrow$p95.cases.train,3),"(c)",
-                  signif(scenrow$p95.deaths.train,3),"(d)",
-                  "/ Prediction:",
-                  signif(scenrow$p95.cases.valid,3),"(c)",
-                  signif(scenrow$p95.deaths.valid,3),"(d)"))+
-    scale_fill_viridis_d(begin=0.8,end=0.2)+
+    ggtitle(paste(scenrow$state,"\nTraining Coverage:",
+                  signif(scenrow$p95.deaths.train,3),"(Deaths)",
+                  signif(scenrow$p95.cases.train,3),"(Cases)",
+                  "\nPrediction Coverage:",
+                  signif(scenrow$p95.deaths.valid,3),"(Deaths)",
+                  signif(scenrow$p95.cases.valid,3),"(Cases)"))+
+    scale_fill_viridis_d(begin=0.8,end=0.2,
+                         breaks=c("Calibration","Validation","IQR","CrI","CrI+Dispersion"))+
     labs(fill="")+theme(legend.position = "bottom")+
     geom_vline(xintercept=as.Date("2020-06-20"))
   print(plt)

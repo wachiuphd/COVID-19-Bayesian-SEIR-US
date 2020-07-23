@@ -3,7 +3,7 @@
 
    Model File:  model/SEIR.reopen.model.R
 
-   Date:  Fri Jul  3 16:13:14 2020
+   Date:  Thu Jul 23 13:07:18 2020
 
    Created by:  "MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle

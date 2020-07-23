@@ -1,0 +1,85 @@
+MCMC ("simMCMC.out","",  # name of output and restart file
+      "",                     # name of data file
+      200000,0,                 # iterations, print predictions flag,
+      100,200000,                 # printing frequency, iters to print
+      10101010);              # random seed (default)
+
+Integrate (Lsodes, 1e-8, 1e-10, 1);
+
+Level {
+  
+  Distrib(GM_NInit, TruncLogNormal, 1000, 10, 1, 10000); # Number of index cases
+  Distrib(GM_TIsolation, TruncLogNormal, 14, 2, 7, 21); # Isolation time after contact tracing
+  Distrib(GM_R0, TruncNormal, 2.9, 0.78, 1.46, 4.5); # Basic reproductive number
+  Distrib(GM_c0, TruncNormal, 13, 5, 7, 20); # Average contacts/day
+  Distrib(GM_TLatent, TruncNormal, 4, 1, 2, 7); # Latency
+  Distrib(GM_TRecover, TruncLogNormal, 10, 1.5, 5, 30); # Time to recovery (no longer infectious)
+  Distrib(GM_IFR, TruncLogNormal, 0.01, 2, 0.001, 0.1); # Infected fatality rate
+  Distrib(GM_TStartTesting, TruncNormal, 90, 30, 60, 150); # Time of start of testing
+  Distrib(GM_TauTesting, TruncNormal, 7, 3, 1, 14); # Time constant for testing
+  Distrib(GM_TTestingRate, TruncNormal, 7, 3, 2, 12);
+  Distrib(GM_TContactsTestingRate, TruncNormal, 2, 1, 1, 3); 
+  Distrib(GM_TestingCoverage, TruncNormal, 0.5, 0.2, 0.2, 0.8);
+  Distrib(GM_TestSensitivity, TruncNormal, 0.7, 0.1, 0.6, 0.95);
+  Distrib(GM_ThetaMin, TruncNormal, 0.416, 0.245, 0, 0.78); # Minimum value for social distancing
+  Distrib(GM_TauTheta, TruncNormal, 17.4, 1.49, 15, 19.1); # Characteristic time for social distancing
+  Distrib(GM_PwrTheta, TruncNormal, 5.02, 1.23, 2.87, 6.46); # Power in Weibull model for social distancing
+  Distrib(GM_HygienePwr, Beta, 2, 2); # Power in Weibull model for social distancing
+  Distrib(GM_FracTraced, TruncLogNormal, 0.25, 2, 0.05, 1); # Fraction traced
+  
+  Distrib(GM_TPosTest, TruncLogNormal, 7, 2, 1, 14); # Reporting delay
+  Distrib(GM_TFatalDeath, TruncLogNormal, 7, 2, 1, 14); # Time from fatal illness to death + reporting delay
+  
+  Distrib(GM_TauS, TruncNormal, 36.2, 14, 25.8, 69.8);
+  Distrib(GM_rMax, TruncNormal, 0.491, 0.183, 0.241, 0.766);
+  Distrib(GM_TauR, TruncNormal, 60.9, 13.6, 36.6, 80.6);
+  
+  Distrib(alpha_Pos, LogUniform, 4, 40);
+  Distrib(alpha_Death, LogUniform, 8, 40);
+  
+  Level {
+    
+    Likelihood(Data(N_pos), NegativeBinomial, alpha_Pos, Prediction(p_N_pos));
+    Likelihood(Data(D_pos), NegativeBinomial, alpha_Death, Prediction(p_D_pos));
+
+    Simulation { # IL 
+
+      Npop = 12671821 ;
+      StartTime(60);
+
+      Print(N_pos, 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 );
+      Data(N_pos, 134 163 168 296 224 262 330 673 488 465 1105 461 937 986 715 1209 1453 899 1006 1287 1529 1344 1465 1293 1672 1173 1222 1346 1140 1842 1585 1197 1151 1551 2049 1826 2724 2119 2126 1980 2219 2253 2563 3137 2450 2994 2341 2122 2270 2641 2887 2325 1656 1266 4014 1677 3239 2432 2088 1734 2294 1545 2388 2268 2758 2352 2508 1713 1178 1111 1527 1622 1462 1343 974 1614 982 929 1156 975 867 1382 797 625 766 732 673 672 473 623 546 593 831 634 658 462 601 715 894 910 786 646 738 724 828 869 937 862 639 614 587 980 1018 1327 1195 954 883 707 1187 1257 1427 1276 965 1173 955 1598 );
+      Print(p_N_pos, 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 );
+      Print(D_pos, 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 );
+      Data(D_pos, 3 1 1 3 3 4 3 7 8 13 18 8 26 42 16 53 33 31 33 73 82 66 68 81 43 74 74 80 124 62 125 31 59 119 97 123 107 79 59 50 142 90 140 102 102 59 44 176 136 137 130 108 57 53 142 191 136 130 71 48 57 145 146 82 108 75 66 28 39 160 103 84 60 60 22 113 96 115 59 69 40 198 94 77 90 78 29 19 18 72 87 52 0 111 22 24 36 63 40 34 26 15 14 21 28 36 27 9 6 6 37 36 20 16 24 19 6 25 8 25 13 18 5 6 23 23 );
+      Print(p_D_pos, 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 );
+      PrintStep( S , 60,  294 , 1);
+      PrintStep( S_C , 60,  294 , 1);
+      PrintStep( E , 60,  294 , 1);
+      PrintStep( E_C , 60,  294 , 1);
+      PrintStep( I_U , 60,  294 , 1);
+      PrintStep( I_C , 60,  294 , 1);
+      PrintStep( I_T , 60,  294 , 1);
+      PrintStep( R_U , 60,  294 , 1);
+      PrintStep( R_T , 60,  294 , 1);
+      PrintStep( F_T , 60,  294 , 1);
+      PrintStep( CumInfected , 60,  294 , 1);
+      PrintStep( CumPosTest , 60,  294 , 1);
+      PrintStep( CumDeath , 60,  294 , 1);
+      PrintStep( dtCumInfected , 60,  294 , 1);
+      PrintStep( dtCumPosTest , 60,  294 , 1);
+      PrintStep( dtCumDeath , 60,  294 , 1);
+      PrintStep( Tot , 60,  294 , 1);
+      PrintStep( ThetaFit , 60,  294 , 1);
+      PrintStep( HygieneFit , 60,  294 , 1);
+      PrintStep( c , 60,  294 , 1);
+      PrintStep( beta , 60,  294 , 1);
+      PrintStep( rho , 60,  294 , 1);
+      PrintStep( lambda , 60,  294 , 1);
+      PrintStep( delta , 60,  294 , 1);
+      PrintStep( Rt , 60,  294 , 1);
+      PrintStep( Refft , 60,  294 , 1);
+
+    }
+  }
+}
