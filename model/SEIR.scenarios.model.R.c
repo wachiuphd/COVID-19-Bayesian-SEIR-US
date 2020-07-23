@@ -3,7 +3,7 @@
 
    Model File:  model/SEIR.scenarios.model.R
 
-   Date:  Fri Jul  3 18:13:39 2020
+   Date:  Wed Jul 22 23:17:55 2020
 
    Created by:  "MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle

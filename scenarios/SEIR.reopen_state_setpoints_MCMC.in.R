@@ -22,7 +22,9 @@ SetPoints ("X_outfile", "X_setpoints",
           GM_TFatalDeath, # Delay time for deaths
           GM_TauS, # Days after TauTheta that Reopening starts
           GM_rMax, # Max reopen (1 = contacts/day back to baseline)
-          GM_TauR # Days after TauS that max reopening occurs
+          GM_TauR, # Days after TauS that max reopening occurs
+          alpha_Pos,
+          alpha_Death
           );
 
 Integrate (Lsodes, 1e-8, 1e-10, 1);
