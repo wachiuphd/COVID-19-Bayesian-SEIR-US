@@ -218,7 +218,6 @@ Initialize {
   TauS = GM_TauS * exp(SD_TauS  * z_TauS); 
   rMax = GM_rMax * exp(SD_rMax  * z_rMax); 
   TauR = GM_TauR * exp(SD_TauR  * z_TauR); 
-  
 }
 
 Dynamics { # ODEs
