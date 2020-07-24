@@ -65,7 +65,7 @@ c0;
 TLatent;
 TRecover;
 IFR;
-TStartTesting;
+T50Testing;
 TauTesting;
 TTestingRate;
 TContactsTestingRate;
@@ -101,7 +101,7 @@ GM_c0 = 13; # Contacts/day
 GM_TLatent = 4; # Latency period
 GM_TRecover = 10; # Time to recovery (no longer infectious)
 GM_IFR = 0.01; # Infected fatality rate
-GM_TStartTesting = 70; # Time of start of testing
+GM_T50Testing = 70; # Time of 50% of final testing rate
 GM_TauTesting = 3;
 GM_TTestingRate = 7; # 1/rate of testing
 GM_TContactsTestingRate = 2; # 1/rate of testing for contacts
@@ -125,7 +125,7 @@ SD_c0; # Contacts/day
 SD_TLatent; # Latency period
 SD_TRecover; # Time to recovery (no longer infectious)
 SD_IFR; # Infected fatality rate
-SD_TStartTesting; # Time of start of testing
+SD_T50Testing; # Time of 50% of final testing rate
 SD_TauTesting;
 SD_TTestingRate; # 1/rate of testing
 SD_TContactsTestingRate; # 1/rate of testing for contacts
@@ -149,7 +149,7 @@ z_c0; # Contacts/day
 z_TLatent; # Latency period
 z_TRecover; # Time to recovery (no longer infectious)
 z_IFR; # Infected fatality rate
-z_TStartTesting; # Time of start of testing
+z_T50Testing; # Time of 50% of final testing rate
 z_TauTesting;
 z_TTestingRate; # 1/rate of testing
 z_TContactsTestingRate; # 1/rate of testing for contacts
@@ -182,7 +182,7 @@ Initialize {
   ## Fatality
   IFR = GM_IFR * exp(SD_IFR  * z_IFR);
   ## Testing
-  TStartTesting = GM_TStartTesting * exp(SD_TStartTesting  * z_TStartTesting);
+  T50Testing = GM_T50Testing * exp(SD_T50Testing  * z_T50Testing);
   TauTesting = GM_TauTesting * exp(SD_TauTesting  * z_TauTesting);
   TTestingRate = GM_TTestingRate * exp(SD_TTestingRate  * z_TTestingRate);
   TContactsTestingRate = GM_TContactsTestingRate * exp(SD_TContactsTestingRate  * z_TContactsTestingRate);
@@ -231,7 +231,7 @@ Dynamics { # ODEs
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact
   ## Time dependence of testing/contact tracting
-  TestingTimeDep = (1-1/(1+exp((t-TStartTesting)/TauTesting))); 
+  TestingTimeDep = (1-1/(1+exp((t-T50Testing)/TauTesting))); 
   ## Contact tracing
   FTraced = FTraced0 * TestingTimeDep;
   ## Testing
@@ -281,7 +281,7 @@ CalcOutputs {
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact
   ## Time dependence of testing/contact tracting
-  TestingTimeDep = (1-1/(1+exp((t-TStartTesting)/TauTesting))); 
+  TestingTimeDep = (1-1/(1+exp((t-T50Testing)/TauTesting))); 
   ## Contact tracing
   FTraced = FTraced0 * TestingTimeDep;
   ## Testing
