@@ -13,8 +13,8 @@ Simulation {
   PrintStep( ThetaFit, HygieneFit, FTraced, lambda, lambda_C, rho_C, delta, c, beta, 60, 160, 1); # Outputs
   PrintStep( Rt, Refft, dtCumInfected, dtCumPosTest, dtCumDeath, N_pos, D_pos, p_N_pos, p_D_pos, Tot, 60, 160, 1); # Outputs
   PrintStep( NInit, TIsolation, R0, c0, TLatent, TRecover, IFR, 60, 160, 1); # Parameters
-  PrintStep( TStartTesting, TauTesting, TTestingRate, TContactsTestingRate, TestingCoverage, TestSensitivity, ThetaMin, TauTheta, PwrTheta, HygienePwr, 60, 160, 1); # Parameters 
-  PrintStep( FTraced0, TPosTest, TFatalDeath, alpha, kappa, rho, lambda0, lambda0_C, rho0_C, 60, 160, 1); # Parameters
+  PrintStep( T50Testing, TauTesting, TTestingRate, TContactsTestingRate, FAsymp, TestingCoverage, TestSensitivity, ThetaMin, TauTheta, PwrTheta, 60, 160, 1); # Parameters 
+  PrintStep( HygienePwr, FTraced0, TPosTest, TFatalDeath, alpha, kappa, rho, lambda0, lambda0_C, rho0_C, 60, 160, 1); # Parameters
   PrintStep( beta0, TauS, rMax, TauR, 60, 160, 1); # Parameters
 }
 

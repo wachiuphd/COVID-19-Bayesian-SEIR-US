@@ -1,11 +1,11 @@
-/* model/SEIR.scenarios.model.R.c
+/* ../model/SEIR.scenarios.model.R.c
    ___________________________________________________
 
-   Model File:  model/SEIR.scenarios.model.R
+   Model File:  ../model/SEIR.scenarios.model.R
 
-   Date:  Thu Jul 23 19:19:02 2020
+   Date:  Fri Jul 24 16:01:13 2020
 
-   Created by:  "MCSim/mod.exe v6.1.0"
+   Created by:  "../MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
    ___________________________________________________
 
@@ -56,7 +56,7 @@
      MuC (is a function)
      DeltaDelta (is a function)
 
-   102 Parameters:
+   106 Parameters:
      Npop = 1e5;
      NInit = 0;
      TIsolation = 0;
@@ -65,10 +65,11 @@
      TLatent = 0;
      TRecover = 0;
      IFR = 0;
-     TStartTesting = 0;
+     T50Testing = 0;
      TauTesting = 0;
      TTestingRate = 0;
      TContactsTestingRate = 0;
+     FAsymp = 0;
      TestingCoverage = 0;
      TestSensitivity = 0;
      ThetaMin = 0;
@@ -97,10 +98,11 @@
      GM_TLatent = 4;
      GM_TRecover = 10;
      GM_IFR = 0.01;
-     GM_TStartTesting = 70;
+     GM_T50Testing = 70;
      GM_TauTesting = 3;
      GM_TTestingRate = 7;
      GM_TContactsTestingRate = 2;
+     GM_FAsymp = 0.5;
      GM_TestingCoverage = 0.5;
      GM_TestSensitivity = 0.7;
      GM_ThetaMin = 0.44;
@@ -120,10 +122,11 @@
      SD_TLatent = 0;
      SD_TRecover = 0;
      SD_IFR = 0;
-     SD_TStartTesting = 0;
+     SD_T50Testing = 0;
      SD_TauTesting = 0;
      SD_TTestingRate = 0;
      SD_TContactsTestingRate = 0;
+     SD_FAsymp = 0;
      SD_TestingCoverage = 0;
      SD_TestSensitivity = 0;
      SD_ThetaMin = 0;
@@ -143,10 +146,11 @@
      z_TLatent = 0;
      z_TRecover = 0;
      z_IFR = 0;
-     z_TStartTesting = 0;
+     z_T50Testing = 0;
      z_TauTesting = 0;
      z_TTestingRate = 0;
      z_TContactsTestingRate = 0;
+     z_FAsymp = 0;
      z_TestingCoverage = 0;
      z_TestSensitivity = 0;
      z_ThetaMin = 0;
@@ -224,108 +228,112 @@
 #define ID_TLatent 0x0002a
 #define ID_TRecover 0x0002b
 #define ID_IFR 0x0002c
-#define ID_TStartTesting 0x0002d
+#define ID_T50Testing 0x0002d
 #define ID_TauTesting 0x0002e
 #define ID_TTestingRate 0x0002f
 #define ID_TContactsTestingRate 0x00030
-#define ID_TestingCoverage 0x00031
-#define ID_TestSensitivity 0x00032
-#define ID_ThetaMin 0x00033
-#define ID_TauTheta 0x00034
-#define ID_PwrTheta 0x00035
-#define ID_HygienePwr 0x00036
-#define ID_FTraced0 0x00037
-#define ID_TPosTest 0x00038
-#define ID_TFatalDeath 0x00039
-#define ID_alpha 0x0003a
-#define ID_kappa 0x0003b
-#define ID_rho 0x0003c
-#define ID_lambda0 0x0003d
-#define ID_lambda0_C 0x0003e
-#define ID_rho0_C 0x0003f
-#define ID_beta0 0x00040
-#define ID_TauS 0x00041
-#define ID_rMax 0x00042
-#define ID_TauR 0x00043
-#define ID_alpha_Pos 0x00044
-#define ID_alpha_Death 0x00045
-#define ID_GM_NInit 0x00046
-#define ID_GM_TIsolation 0x00047
-#define ID_GM_R0 0x00048
-#define ID_GM_c0 0x00049
-#define ID_GM_TLatent 0x0004a
-#define ID_GM_TRecover 0x0004b
-#define ID_GM_IFR 0x0004c
-#define ID_GM_TStartTesting 0x0004d
-#define ID_GM_TauTesting 0x0004e
-#define ID_GM_TTestingRate 0x0004f
-#define ID_GM_TContactsTestingRate 0x00050
-#define ID_GM_TestingCoverage 0x00051
-#define ID_GM_TestSensitivity 0x00052
-#define ID_GM_ThetaMin 0x00053
-#define ID_GM_TauTheta 0x00054
-#define ID_GM_PwrTheta 0x00055
-#define ID_GM_HygienePwr 0x00056
-#define ID_GM_FracTraced 0x00057
-#define ID_GM_TPosTest 0x00058
-#define ID_GM_TFatalDeath 0x00059
-#define ID_GM_TauS 0x0005a
-#define ID_GM_rMax 0x0005b
-#define ID_GM_TauR 0x0005c
-#define ID_SD_NInit 0x0005d
-#define ID_SD_TIsolation 0x0005e
-#define ID_SD_R0 0x0005f
-#define ID_SD_c0 0x00060
-#define ID_SD_TLatent 0x00061
-#define ID_SD_TRecover 0x00062
-#define ID_SD_IFR 0x00063
-#define ID_SD_TStartTesting 0x00064
-#define ID_SD_TauTesting 0x00065
-#define ID_SD_TTestingRate 0x00066
-#define ID_SD_TContactsTestingRate 0x00067
-#define ID_SD_TestingCoverage 0x00068
-#define ID_SD_TestSensitivity 0x00069
-#define ID_SD_ThetaMin 0x0006a
-#define ID_SD_TauTheta 0x0006b
-#define ID_SD_PwrTheta 0x0006c
-#define ID_SD_HygienePwr 0x0006d
-#define ID_SD_FracTraced 0x0006e
-#define ID_SD_TPosTest 0x0006f
-#define ID_SD_TFatalDeath 0x00070
-#define ID_SD_TauS 0x00071
-#define ID_SD_rMax 0x00072
-#define ID_SD_TauR 0x00073
-#define ID_z_NInit 0x00074
-#define ID_z_TIsolation 0x00075
-#define ID_z_R0 0x00076
-#define ID_z_c0 0x00077
-#define ID_z_TLatent 0x00078
-#define ID_z_TRecover 0x00079
-#define ID_z_IFR 0x0007a
-#define ID_z_TStartTesting 0x0007b
-#define ID_z_TauTesting 0x0007c
-#define ID_z_TTestingRate 0x0007d
-#define ID_z_TContactsTestingRate 0x0007e
-#define ID_z_TestingCoverage 0x0007f
-#define ID_z_TestSensitivity 0x00080
-#define ID_z_ThetaMin 0x00081
-#define ID_z_TauTheta 0x00082
-#define ID_z_PwrTheta 0x00083
-#define ID_z_HygienePwr 0x00084
-#define ID_z_FracTraced 0x00085
-#define ID_z_TPosTest 0x00086
-#define ID_z_TFatalDeath 0x00087
-#define ID_z_TauS 0x00088
-#define ID_z_rMax 0x00089
-#define ID_z_TauR 0x0008a
+#define ID_FAsymp 0x00031
+#define ID_TestingCoverage 0x00032
+#define ID_TestSensitivity 0x00033
+#define ID_ThetaMin 0x00034
+#define ID_TauTheta 0x00035
+#define ID_PwrTheta 0x00036
+#define ID_HygienePwr 0x00037
+#define ID_FTraced0 0x00038
+#define ID_TPosTest 0x00039
+#define ID_TFatalDeath 0x0003a
+#define ID_alpha 0x0003b
+#define ID_kappa 0x0003c
+#define ID_rho 0x0003d
+#define ID_lambda0 0x0003e
+#define ID_lambda0_C 0x0003f
+#define ID_rho0_C 0x00040
+#define ID_beta0 0x00041
+#define ID_TauS 0x00042
+#define ID_rMax 0x00043
+#define ID_TauR 0x00044
+#define ID_alpha_Pos 0x00045
+#define ID_alpha_Death 0x00046
+#define ID_GM_NInit 0x00047
+#define ID_GM_TIsolation 0x00048
+#define ID_GM_R0 0x00049
+#define ID_GM_c0 0x0004a
+#define ID_GM_TLatent 0x0004b
+#define ID_GM_TRecover 0x0004c
+#define ID_GM_IFR 0x0004d
+#define ID_GM_T50Testing 0x0004e
+#define ID_GM_TauTesting 0x0004f
+#define ID_GM_TTestingRate 0x00050
+#define ID_GM_TContactsTestingRate 0x00051
+#define ID_GM_FAsymp 0x00052
+#define ID_GM_TestingCoverage 0x00053
+#define ID_GM_TestSensitivity 0x00054
+#define ID_GM_ThetaMin 0x00055
+#define ID_GM_TauTheta 0x00056
+#define ID_GM_PwrTheta 0x00057
+#define ID_GM_HygienePwr 0x00058
+#define ID_GM_FracTraced 0x00059
+#define ID_GM_TPosTest 0x0005a
+#define ID_GM_TFatalDeath 0x0005b
+#define ID_GM_TauS 0x0005c
+#define ID_GM_rMax 0x0005d
+#define ID_GM_TauR 0x0005e
+#define ID_SD_NInit 0x0005f
+#define ID_SD_TIsolation 0x00060
+#define ID_SD_R0 0x00061
+#define ID_SD_c0 0x00062
+#define ID_SD_TLatent 0x00063
+#define ID_SD_TRecover 0x00064
+#define ID_SD_IFR 0x00065
+#define ID_SD_T50Testing 0x00066
+#define ID_SD_TauTesting 0x00067
+#define ID_SD_TTestingRate 0x00068
+#define ID_SD_TContactsTestingRate 0x00069
+#define ID_SD_FAsymp 0x0006a
+#define ID_SD_TestingCoverage 0x0006b
+#define ID_SD_TestSensitivity 0x0006c
+#define ID_SD_ThetaMin 0x0006d
+#define ID_SD_TauTheta 0x0006e
+#define ID_SD_PwrTheta 0x0006f
+#define ID_SD_HygienePwr 0x00070
+#define ID_SD_FracTraced 0x00071
+#define ID_SD_TPosTest 0x00072
+#define ID_SD_TFatalDeath 0x00073
+#define ID_SD_TauS 0x00074
+#define ID_SD_rMax 0x00075
+#define ID_SD_TauR 0x00076
+#define ID_z_NInit 0x00077
+#define ID_z_TIsolation 0x00078
+#define ID_z_R0 0x00079
+#define ID_z_c0 0x0007a
+#define ID_z_TLatent 0x0007b
+#define ID_z_TRecover 0x0007c
+#define ID_z_IFR 0x0007d
+#define ID_z_T50Testing 0x0007e
+#define ID_z_TauTesting 0x0007f
+#define ID_z_TTestingRate 0x00080
+#define ID_z_TContactsTestingRate 0x00081
+#define ID_z_FAsymp 0x00082
+#define ID_z_TestingCoverage 0x00083
+#define ID_z_TestSensitivity 0x00084
+#define ID_z_ThetaMin 0x00085
+#define ID_z_TauTheta 0x00086
+#define ID_z_PwrTheta 0x00087
+#define ID_z_HygienePwr 0x00088
+#define ID_z_FracTraced 0x00089
+#define ID_z_TPosTest 0x0008a
+#define ID_z_TFatalDeath 0x0008b
+#define ID_z_TauS 0x0008c
+#define ID_z_rMax 0x0008d
+#define ID_z_TauR 0x0008e
 
 
 /*----- Global Variables */
 
 /* For export. Keep track of who we are. */
-char szModelDescFilename[] = "model/SEIR.scenarios.model.R";
+char szModelDescFilename[] = "../model/SEIR.scenarios.model.R";
 char szModelSourceFilename[] = __FILE__;
-char szModelGenAndVersion[] = "MCSim/mod.exe v6.1.0";
+char szModelGenAndVersion[] = "../MCSim/mod.exe v6.1.0";
 
 /* Externs */
 extern BOOL vbModelReinitd;
@@ -335,7 +343,7 @@ int vnStates = 13;
 int vnOutputs = 21;
 int vnModelVars = 34;
 int vnInputs = 3;
-int vnParms = 102;
+int vnParms = 106;
 
 /* States and Outputs*/
 double vrgModelVars[34];
@@ -352,10 +360,11 @@ double c0;
 double TLatent;
 double TRecover;
 double IFR;
-double TStartTesting;
+double T50Testing;
 double TauTesting;
 double TTestingRate;
 double TContactsTestingRate;
+double FAsymp;
 double TestingCoverage;
 double TestSensitivity;
 double ThetaMin;
@@ -384,10 +393,11 @@ double GM_c0;
 double GM_TLatent;
 double GM_TRecover;
 double GM_IFR;
-double GM_TStartTesting;
+double GM_T50Testing;
 double GM_TauTesting;
 double GM_TTestingRate;
 double GM_TContactsTestingRate;
+double GM_FAsymp;
 double GM_TestingCoverage;
 double GM_TestSensitivity;
 double GM_ThetaMin;
@@ -407,10 +417,11 @@ double SD_c0;
 double SD_TLatent;
 double SD_TRecover;
 double SD_IFR;
-double SD_TStartTesting;
+double SD_T50Testing;
 double SD_TauTesting;
 double SD_TTestingRate;
 double SD_TContactsTestingRate;
+double SD_FAsymp;
 double SD_TestingCoverage;
 double SD_TestSensitivity;
 double SD_ThetaMin;
@@ -430,10 +441,11 @@ double z_c0;
 double z_TLatent;
 double z_TRecover;
 double z_IFR;
-double z_TStartTesting;
+double z_T50Testing;
 double z_TauTesting;
 double z_TTestingRate;
 double z_TContactsTestingRate;
+double z_FAsymp;
 double z_TestingCoverage;
 double z_TestSensitivity;
 double z_ThetaMin;
@@ -498,10 +510,11 @@ VMMAPSTRCT vrgvmGlo[] = {
   {"TLatent", (PVOID) &TLatent, ID_PARM | ID_TLatent},
   {"TRecover", (PVOID) &TRecover, ID_PARM | ID_TRecover},
   {"IFR", (PVOID) &IFR, ID_PARM | ID_IFR},
-  {"TStartTesting", (PVOID) &TStartTesting, ID_PARM | ID_TStartTesting},
+  {"T50Testing", (PVOID) &T50Testing, ID_PARM | ID_T50Testing},
   {"TauTesting", (PVOID) &TauTesting, ID_PARM | ID_TauTesting},
   {"TTestingRate", (PVOID) &TTestingRate, ID_PARM | ID_TTestingRate},
   {"TContactsTestingRate", (PVOID) &TContactsTestingRate, ID_PARM | ID_TContactsTestingRate},
+  {"FAsymp", (PVOID) &FAsymp, ID_PARM | ID_FAsymp},
   {"TestingCoverage", (PVOID) &TestingCoverage, ID_PARM | ID_TestingCoverage},
   {"TestSensitivity", (PVOID) &TestSensitivity, ID_PARM | ID_TestSensitivity},
   {"ThetaMin", (PVOID) &ThetaMin, ID_PARM | ID_ThetaMin},
@@ -530,10 +543,11 @@ VMMAPSTRCT vrgvmGlo[] = {
   {"GM_TLatent", (PVOID) &GM_TLatent, ID_PARM | ID_GM_TLatent},
   {"GM_TRecover", (PVOID) &GM_TRecover, ID_PARM | ID_GM_TRecover},
   {"GM_IFR", (PVOID) &GM_IFR, ID_PARM | ID_GM_IFR},
-  {"GM_TStartTesting", (PVOID) &GM_TStartTesting, ID_PARM | ID_GM_TStartTesting},
+  {"GM_T50Testing", (PVOID) &GM_T50Testing, ID_PARM | ID_GM_T50Testing},
   {"GM_TauTesting", (PVOID) &GM_TauTesting, ID_PARM | ID_GM_TauTesting},
   {"GM_TTestingRate", (PVOID) &GM_TTestingRate, ID_PARM | ID_GM_TTestingRate},
   {"GM_TContactsTestingRate", (PVOID) &GM_TContactsTestingRate, ID_PARM | ID_GM_TContactsTestingRate},
+  {"GM_FAsymp", (PVOID) &GM_FAsymp, ID_PARM | ID_GM_FAsymp},
   {"GM_TestingCoverage", (PVOID) &GM_TestingCoverage, ID_PARM | ID_GM_TestingCoverage},
   {"GM_TestSensitivity", (PVOID) &GM_TestSensitivity, ID_PARM | ID_GM_TestSensitivity},
   {"GM_ThetaMin", (PVOID) &GM_ThetaMin, ID_PARM | ID_GM_ThetaMin},
@@ -553,10 +567,11 @@ VMMAPSTRCT vrgvmGlo[] = {
   {"SD_TLatent", (PVOID) &SD_TLatent, ID_PARM | ID_SD_TLatent},
   {"SD_TRecover", (PVOID) &SD_TRecover, ID_PARM | ID_SD_TRecover},
   {"SD_IFR", (PVOID) &SD_IFR, ID_PARM | ID_SD_IFR},
-  {"SD_TStartTesting", (PVOID) &SD_TStartTesting, ID_PARM | ID_SD_TStartTesting},
+  {"SD_T50Testing", (PVOID) &SD_T50Testing, ID_PARM | ID_SD_T50Testing},
   {"SD_TauTesting", (PVOID) &SD_TauTesting, ID_PARM | ID_SD_TauTesting},
   {"SD_TTestingRate", (PVOID) &SD_TTestingRate, ID_PARM | ID_SD_TTestingRate},
   {"SD_TContactsTestingRate", (PVOID) &SD_TContactsTestingRate, ID_PARM | ID_SD_TContactsTestingRate},
+  {"SD_FAsymp", (PVOID) &SD_FAsymp, ID_PARM | ID_SD_FAsymp},
   {"SD_TestingCoverage", (PVOID) &SD_TestingCoverage, ID_PARM | ID_SD_TestingCoverage},
   {"SD_TestSensitivity", (PVOID) &SD_TestSensitivity, ID_PARM | ID_SD_TestSensitivity},
   {"SD_ThetaMin", (PVOID) &SD_ThetaMin, ID_PARM | ID_SD_ThetaMin},
@@ -576,10 +591,11 @@ VMMAPSTRCT vrgvmGlo[] = {
   {"z_TLatent", (PVOID) &z_TLatent, ID_PARM | ID_z_TLatent},
   {"z_TRecover", (PVOID) &z_TRecover, ID_PARM | ID_z_TRecover},
   {"z_IFR", (PVOID) &z_IFR, ID_PARM | ID_z_IFR},
-  {"z_TStartTesting", (PVOID) &z_TStartTesting, ID_PARM | ID_z_TStartTesting},
+  {"z_T50Testing", (PVOID) &z_T50Testing, ID_PARM | ID_z_T50Testing},
   {"z_TauTesting", (PVOID) &z_TauTesting, ID_PARM | ID_z_TauTesting},
   {"z_TTestingRate", (PVOID) &z_TTestingRate, ID_PARM | ID_z_TTestingRate},
   {"z_TContactsTestingRate", (PVOID) &z_TContactsTestingRate, ID_PARM | ID_z_TContactsTestingRate},
+  {"z_FAsymp", (PVOID) &z_FAsymp, ID_PARM | ID_z_FAsymp},
   {"z_TestingCoverage", (PVOID) &z_TestingCoverage, ID_PARM | ID_z_TestingCoverage},
   {"z_TestSensitivity", (PVOID) &z_TestSensitivity, ID_PARM | ID_z_TestSensitivity},
   {"z_ThetaMin", (PVOID) &z_ThetaMin, ID_PARM | ID_z_ThetaMin},
@@ -695,10 +711,11 @@ void InitModel(void)
   TLatent = 0;
   TRecover = 0;
   IFR = 0;
-  TStartTesting = 0;
+  T50Testing = 0;
   TauTesting = 0;
   TTestingRate = 0;
   TContactsTestingRate = 0;
+  FAsymp = 0;
   TestingCoverage = 0;
   TestSensitivity = 0;
   ThetaMin = 0;
@@ -727,10 +744,11 @@ void InitModel(void)
   GM_TLatent = 4;
   GM_TRecover = 10;
   GM_IFR = 0.01;
-  GM_TStartTesting = 70;
+  GM_T50Testing = 70;
   GM_TauTesting = 3;
   GM_TTestingRate = 7;
   GM_TContactsTestingRate = 2;
+  GM_FAsymp = 0.5;
   GM_TestingCoverage = 0.5;
   GM_TestSensitivity = 0.7;
   GM_ThetaMin = 0.44;
@@ -750,10 +768,11 @@ void InitModel(void)
   SD_TLatent = 0;
   SD_TRecover = 0;
   SD_IFR = 0;
-  SD_TStartTesting = 0;
+  SD_T50Testing = 0;
   SD_TauTesting = 0;
   SD_TTestingRate = 0;
   SD_TContactsTestingRate = 0;
+  SD_FAsymp = 0;
   SD_TestingCoverage = 0;
   SD_TestSensitivity = 0;
   SD_ThetaMin = 0;
@@ -773,10 +792,11 @@ void InitModel(void)
   z_TLatent = 0;
   z_TRecover = 0;
   z_IFR = 0;
-  z_TStartTesting = 0;
+  z_T50Testing = 0;
   z_TauTesting = 0;
   z_TTestingRate = 0;
   z_TContactsTestingRate = 0;
+  z_FAsymp = 0;
   z_TestingCoverage = 0;
   z_TestSensitivity = 0;
   z_ThetaMin = 0;
@@ -845,7 +865,7 @@ void CalcDeriv (double  rgModelVars[], double  rgDerivs[], PDOUBLE pdTime)
 
   rgModelVars[ID_c] = ( vrgInputs[ID_DeltaDelta].dVal > -1 ) ? ( c0 * ( rgModelVars[ID_ThetaFit] + ( 1 - ThetaMin ) * ReopenFit ) ) : ctmp ;
 
-  TestingTimeDep = ( 1 -1 / ( 1 + exp ( ( (*pdTime) - TStartTesting ) / TauTesting ) ) ) ;
+  TestingTimeDep = ( 1 -1 / ( 1 + exp ( ( (*pdTime) - T50Testing ) / TauTesting ) ) ) ;
 
   FTraced1 = FTraced0 * TestingTimeDep ;
 
@@ -916,10 +936,11 @@ void ScaleModel (PDOUBLE pdTime)
 
   IFR = GM_IFR * exp ( SD_IFR * z_IFR ) ;
 
-  TStartTesting = GM_TStartTesting * exp ( SD_TStartTesting * z_TStartTesting ) ;
+  T50Testing = GM_T50Testing * exp ( SD_T50Testing * z_T50Testing ) ;
   TauTesting = GM_TauTesting * exp ( SD_TauTesting * z_TauTesting ) ;
   TTestingRate = GM_TTestingRate * exp ( SD_TTestingRate * z_TTestingRate ) ;
   TContactsTestingRate = GM_TContactsTestingRate * exp ( SD_TContactsTestingRate * z_TContactsTestingRate ) ;
+  FAsymp = GM_FAsymp * exp ( SD_FAsymp * z_FAsymp ) ;
   TestingCoverage = GM_TestingCoverage * exp ( SD_TestingCoverage * z_TestingCoverage ) ;
   TestSensitivity = GM_TestSensitivity * exp ( SD_TestSensitivity * z_TestSensitivity ) ;
 
@@ -936,8 +957,8 @@ void ScaleModel (PDOUBLE pdTime)
   alpha = 1 / TIsolation ;
   kappa = 1 / TLatent ;
   rho = 1 / TRecover ;
-  lambda0 = TestingCoverage * TestSensitivity / TTestingRate ;
-  lambda0_C = 1.0 * TestSensitivity / TContactsTestingRate ;
+  lambda0 = ( 1 - FAsymp ) * TestingCoverage * TestSensitivity / TTestingRate ;
+  lambda0_C = ( 1 - FAsymp ) * 1.0 * TestSensitivity / TContactsTestingRate ;
   rho0_C = 1.0 * ( 1.0 - TestSensitivity ) / TContactsTestingRate ;
   beta0 = R0 * rho / c0 ;
 
@@ -1002,7 +1023,7 @@ void CalcOutputs (double  rgModelVars[], double  rgDerivs[], PDOUBLE pdTime)
   ReopenFit = ( ( Delta * ( 1 - pow ( ThetaMin , 1 + HygienePwr ) ) - ( pow ( rgModelVars[ID_ThetaFit] , 1 + HygienePwr ) - pow ( ThetaMin , 1 + HygienePwr ) ) ) / ( ( 1 - ThetaMin ) * pow ( rgModelVars[ID_ThetaFit] , HygienePwr ) ) ) ;
   rgModelVars[ID_c] = ( vrgInputs[ID_DeltaDelta].dVal > -1 ) ? ( c0 * ( rgModelVars[ID_ThetaFit] + ( 1 - ThetaMin ) * ReopenFit ) ) : ctmp ;
 
-  TestingTimeDep = ( 1 -1 / ( 1 + exp ( ( (*pdTime) - TStartTesting ) / TauTesting ) ) ) ;
+  TestingTimeDep = ( 1 -1 / ( 1 + exp ( ( (*pdTime) - T50Testing ) / TauTesting ) ) ) ;
 
   FTraced1 = FTraced0 * TestingTimeDep ;
   FTracedTmp = FTraced1 * ( ( vrgInputs[ID_MuC].dVal > 0 ) ? vrgInputs[ID_MuC].dVal : 1 ) ;

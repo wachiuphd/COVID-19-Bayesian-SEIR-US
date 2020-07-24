@@ -7,10 +7,11 @@ SetPoints ("./TX/SEIR_TX_TimeSeries.2.1.0.out", "./TX/SEIR_TX_MCMC1234.samps.out
           GM_TLatent, # Latency period
           GM_TRecover, # Time to recovery (no longer infectious)
           GM_IFR, # Infected fatality rate
-          GM_TStartTesting, # Time of start of testing
+          GM_T50Testing, # Time of 50% of final testing rate
           GM_TauTesting, # Time constant for testing
           GM_TTestingRate, # 1/rate of testing
           GM_TContactsTestingRate, # 1/rate of testing for contacts
+          GM_FAsymp, # Fraction asymptomatic
           GM_TestingCoverage, # Coverage of testing
           GM_TestSensitivity, # True positive rate
           GM_ThetaMin, # Minimum value for social distancing
@@ -22,7 +23,9 @@ SetPoints ("./TX/SEIR_TX_TimeSeries.2.1.0.out", "./TX/SEIR_TX_MCMC1234.samps.out
           GM_TFatalDeath, # Delay time for deaths
           GM_TauS, # Days after TauTheta that Reopening starts
           GM_rMax, # Max reopen (1 = contacts/day back to baseline)
-          GM_TauR # Days after TauS that max reopening occurs
+          GM_TauR, # Days after TauS that max reopening occurs
+          alpha_Pos,
+          alpha_Death
           );
 
 Integrate (Lsodes, 1e-8, 1e-10, 1);

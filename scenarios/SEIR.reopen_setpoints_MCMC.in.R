@@ -7,10 +7,11 @@ SetPoints ("X_outfile", "X_setpoints",
            GM_TLatent, # Latency period
            GM_TRecover, # Time to recovery (no longer infectious)
            GM_IFR, # Infected fatality rate
-           GM_TStartTesting, # Time of start of testing
+           GM_T50Testing, # Time of 50% of final testing rate
            GM_TauTesting, # Time constant for testing
            GM_TTestingRate, # 1/rate of testing
            GM_TContactsTestingRate, # 1/rate of testing for contacts
+           GM_FAsymp, # Fraction asymptomatic
            GM_TestingCoverage, # Coverage of testing
            GM_TestSensitivity, # True positive rate
            GM_ThetaMin, # Minimum value for social distancing

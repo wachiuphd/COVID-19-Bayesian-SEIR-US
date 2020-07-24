@@ -131,7 +131,7 @@ ggplot(totals.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10
 timedep.df <- melt(out_dat[,c("Time","ThetaFit","HygieneFit","FTraced", "lambda", "lambda_C", "rho_C", "delta", "c", "beta","Rt","Refft")],id.vars=1)
 ggplot(timedep.df,aes(x=Time,y=value,color=variable))+geom_line() +facet_wrap(~variable,scales="free_y")+theme(legend.position = "none")
 
-const.df <- melt(out_dat[,c("Time","NInit", "TIsolation", "R0", "c0", "TLatent", "TRecover", "IFR", "TStartTesting", "TauTesting", "TTestingRate", "TContactsTestingRate", "TestingCoverage", "TestSensitivity", "ThetaMin", "TauTheta", "PwrTheta", "HygienePwr", "FTraced0", "TPosTest", "TFatalDeath", "alpha", "kappa", "rho", "lambda0", "lambda0_C", "rho0_C","beta0")],id.vars=1)
+const.df <- melt(out_dat[,c("Time","NInit", "TIsolation", "R0", "c0", "TLatent", "TRecover", "IFR", "T50Testing", "TauTesting", "TTestingRate", "TContactsTestingRate", "FAsymp","TestingCoverage", "TestSensitivity", "ThetaMin", "TauTheta", "PwrTheta", "HygienePwr", "FTraced0", "TPosTest", "TFatalDeath", "alpha", "kappa", "rho", "lambda0", "lambda0_C", "rho0_C","beta0")],id.vars=1)
 ggplot(const.df,aes(x=Time,y=value,color=variable))+geom_line()+scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
 
 out_dat.tmp<-out_dat[,c("Time","N_pos","D_pos")]
