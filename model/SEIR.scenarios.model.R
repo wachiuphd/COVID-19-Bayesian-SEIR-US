@@ -69,6 +69,7 @@ T50Testing;
 TauTesting;
 TTestingRate;
 TContactsTestingRate;
+FAsymp;
 TestingCoverage;
 TestSensitivity;
 ThetaMin;
@@ -105,6 +106,7 @@ GM_T50Testing = 70; # Time of 50% of final testing rate
 GM_TauTesting = 3;
 GM_TTestingRate = 7; # 1/rate of testing
 GM_TContactsTestingRate = 2; # 1/rate of testing for contacts
+GM_FAsymp = 0.5; # Fraction asymptomatic
 GM_TestingCoverage = 0.5; # Coverage of testing
 GM_TestSensitivity = 0.7; # True positive rate
 GM_ThetaMin = 0.44; # Minimum value for social distancing
@@ -129,6 +131,7 @@ SD_T50Testing; # Time of 50% of final testing rate
 SD_TauTesting;
 SD_TTestingRate; # 1/rate of testing
 SD_TContactsTestingRate; # 1/rate of testing for contacts
+SD_FAsymp; # Fraction asymptomatic
 SD_TestingCoverage; # Coverage of testing
 SD_TestSensitivity; # True positive rate
 SD_ThetaMin; # Minimum value for social distancing
@@ -153,6 +156,7 @@ z_T50Testing; # Time of 50% of final testing rate
 z_TauTesting;
 z_TTestingRate; # 1/rate of testing
 z_TContactsTestingRate; # 1/rate of testing for contacts
+z_FAsymp; # Fraction asymptomatic
 z_TestingCoverage; # Coverage of testing
 z_TestSensitivity; # True positive rate
 z_ThetaMin; # Minimum value for social distancing
@@ -190,6 +194,7 @@ Initialize {
   TauTesting = GM_TauTesting * exp(SD_TauTesting  * z_TauTesting);
   TTestingRate = GM_TTestingRate * exp(SD_TTestingRate  * z_TTestingRate);
   TContactsTestingRate = GM_TContactsTestingRate * exp(SD_TContactsTestingRate  * z_TContactsTestingRate);
+  FAsymp = GM_FAsymp * exp(SD_FAsymp  * z_FAsymp);
   TestingCoverage = GM_TestingCoverage * exp(SD_TestingCoverage  * z_TestingCoverage);
   TestSensitivity = GM_TestSensitivity * exp(SD_TestSensitivity  * z_TestSensitivity);
   # Social distancing and hygiene
@@ -206,8 +211,8 @@ Initialize {
   alpha = 1/TIsolation;
   kappa = 1/TLatent;
   rho = 1/TRecover;
-  lambda0 = TestingCoverage*TestSensitivity/TTestingRate;
-  lambda0_C = 1.0*TestSensitivity/TContactsTestingRate;
+  lambda0 = (1 - FAsymp)*TestingCoverage*TestSensitivity/TTestingRate;
+  lambda0_C = (1 - FAsymp)*1.0*TestSensitivity/TContactsTestingRate;
   rho0_C = 1.0*(1.0 - TestSensitivity)/TContactsTestingRate;
   beta0 = R0 * rho / c0;
   # State parameter initialization
