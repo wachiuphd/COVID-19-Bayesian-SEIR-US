@@ -18,6 +18,7 @@ library(data.table)
 library(gridExtra)
 library(GGally)
 library(RCurl)
+library(ggpubr)
 knitr::opts_chunk$set(echo = TRUE, dpi = 300 )
 datadir <- "../data"
 functiondir <- "../functions"
@@ -443,6 +444,57 @@ for (j in 1:nrow(scen.df)) {
 }
 dev.off()
 ```
+```{r check mobility}
+statenow<-"TX"
+mobilitydat <- fread(file.path("../MobilityMetrics","MobilityFits.csv"))
+mobilitydat$Date <- as.Date(mobilitydat$date)
+mdat<-subset(mobilitydat,State.Abbr==statenow)
+predictdat <- fread(file.path(statenow,paste0("SEIR_",statenow,"_MCMC.prediction.quantiles.csv")))
+predictdat$Date <- as.Date(predictdat$Time,origin=datezero)
+cdat <- subset(predictdat,Output_Var=="c")
+c0 <- cdat$Prediction.50.[1]
+pmob<-ggplot(cdat)+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25./c0,ymax=Prediction.75./c0,fill="IQR"))+
+  scale_fill_viridis_d(begin=0.4,end=0.8)+
+  geom_line(aes(x=Date,y=Prediction.50./c0))+
+  geom_line(aes(x=Date,y=normfit,color=MobilityMetric,linetype=MobilityMetric),data=mdat)+
+  xlim(first(mdat$Date),last(mdat$Date))
+print(pmob)
+
+cmin <- min(cdat$Prediction.50.)
+pmobscale<-ggplot(cdat)+
+  geom_ribbon(aes(x=Date,ymin=(Prediction.25.-cmin)/(c0-cmin),
+                  ymax=(Prediction.75.-cmin)/(c0-cmin),fill="IQR"))+
+  scale_fill_viridis_d(begin=0.4,end=0.8)+
+  geom_line(aes(x=Date,y=(Prediction.50.-cmin)/(c0-cmin)))+
+  geom_line(aes(x=Date,y=scalefit,color=MobilityMetric,linetype=MobilityMetric),data=mdat)+
+  xlim(first(mdat$Date),last(mdat$Date))
+print(pmobscale)
+
+cmed <- cdat[,c("Date","Prediction.50.")]
+cmed$NormPred <- cmed$Prediction.50./c0
+cmed$ScalePred <- (cmed$Prediction.50.-cmin)/(c0-cmin)
+mob.df <- merge(mdat,cmed)
+pnormscat<-ggplot(mob.df,aes(x=normfit,y=NormPred))+geom_point(aes(color=numDate))+
+  geom_abline()+
+  geom_abline(intercept=c(0.1,-0.1),linetype="dotted")+
+  xlab("Mobility Metric")+
+  ylab("Normalized contact rate")+
+  xlim(0,1)+ylim(0,1)+
+  facet_wrap(~MobilityMetric)
+print(pnormscat+ggtitle("Normalized to initial=1"))
+
+pscalescat<-ggplot(mob.df,aes(x=scalefit,y=NormPred))+geom_point(aes(color=numDate))+
+  geom_abline()+
+  geom_abline(intercept=c(0.1,-0.1),linetype="dotted")+
+  xlab("Mobility Metric")+
+  xlim(0,1)+ylim(0,1)+
+  ylab("Scaled contact rate")+
+  facet_wrap(~MobilityMetric)
+print(pscalescat+ggtitle("Scaled to 0-1"))
+
+```
+
 ```{r echo=FALSE}
 devtools::session_info()
 ```
