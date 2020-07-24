@@ -65,10 +65,11 @@ c0;
 TLatent;
 TRecover;
 IFR;
-TStartTesting;
+T50Testing;
 TauTesting;
 TTestingRate;
 TContactsTestingRate;
+FAsymp;
 TestingCoverage;
 TestSensitivity;
 ThetaMin;
@@ -101,10 +102,11 @@ GM_c0 = 13; # Contacts/day
 GM_TLatent = 4; # Latency period
 GM_TRecover = 10; # Time to recovery (no longer infectious)
 GM_IFR = 0.01; # Infected fatality rate
-GM_TStartTesting = 70; # Time of start of testing
+GM_T50Testing = 70; # Time of 50% of final testing rate
 GM_TauTesting = 3;
 GM_TTestingRate = 7; # 1/rate of testing
 GM_TContactsTestingRate = 2; # 1/rate of testing for contacts
+GM_FAsymp = 0.5; # Fraction asymptomatic
 GM_TestingCoverage = 0.5; # Coverage of testing
 GM_TestSensitivity = 0.7; # True positive rate
 GM_ThetaMin = 0.44; # Minimum value for social distancing
@@ -125,10 +127,11 @@ SD_c0; # Contacts/day
 SD_TLatent; # Latency period
 SD_TRecover; # Time to recovery (no longer infectious)
 SD_IFR; # Infected fatality rate
-SD_TStartTesting; # Time of start of testing
+SD_T50Testing; # Time of 50% of final testing rate
 SD_TauTesting;
 SD_TTestingRate; # 1/rate of testing
 SD_TContactsTestingRate; # 1/rate of testing for contacts
+SD_FAsymp; # Fraction asymptomatic
 SD_TestingCoverage; # Coverage of testing
 SD_TestSensitivity; # True positive rate
 SD_ThetaMin; # Minimum value for social distancing
@@ -149,10 +152,11 @@ z_c0; # Contacts/day
 z_TLatent; # Latency period
 z_TRecover; # Time to recovery (no longer infectious)
 z_IFR; # Infected fatality rate
-z_TStartTesting; # Time of start of testing
+z_T50Testing; # Time of 50% of final testing rate
 z_TauTesting;
 z_TTestingRate; # 1/rate of testing
 z_TContactsTestingRate; # 1/rate of testing for contacts
+z_FAsymp; # Fraction asymptomatic
 z_TestingCoverage; # Coverage of testing
 z_TestSensitivity; # True positive rate
 z_ThetaMin; # Minimum value for social distancing
@@ -182,10 +186,11 @@ Initialize {
   ## Fatality
   IFR = GM_IFR * exp(SD_IFR  * z_IFR);
   ## Testing
-  TStartTesting = GM_TStartTesting * exp(SD_TStartTesting  * z_TStartTesting);
+  T50Testing = GM_T50Testing * exp(SD_T50Testing  * z_T50Testing);
   TauTesting = GM_TauTesting * exp(SD_TauTesting  * z_TauTesting);
   TTestingRate = GM_TTestingRate * exp(SD_TTestingRate  * z_TTestingRate);
   TContactsTestingRate = GM_TContactsTestingRate * exp(SD_TContactsTestingRate  * z_TContactsTestingRate);
+  FAsymp = GM_FAsymp * exp(SD_FAsymp  * z_FAsymp);
   TestingCoverage = GM_TestingCoverage * exp(SD_TestingCoverage  * z_TestingCoverage);
   TestSensitivity = GM_TestSensitivity * exp(SD_TestSensitivity  * z_TestSensitivity);
   # Social distancing and hygiene
@@ -202,8 +207,8 @@ Initialize {
   alpha = 1/TIsolation;
   kappa = 1/TLatent;
   rho = 1/TRecover;
-  lambda0 = TestingCoverage*TestSensitivity/TTestingRate;
-  lambda0_C = 1.0*TestSensitivity/TContactsTestingRate;
+  lambda0 = (1 - FAsymp)*TestingCoverage*TestSensitivity/TTestingRate;
+  lambda0_C = (1 - FAsymp)*1.0*TestSensitivity/TContactsTestingRate;
   rho0_C = 1.0*(1.0 - TestSensitivity)/TContactsTestingRate;
   beta0 = R0 * rho / c0;
   # State parameter initialization
@@ -213,7 +218,6 @@ Initialize {
   TauS = GM_TauS * exp(SD_TauS  * z_TauS); 
   rMax = GM_rMax * exp(SD_rMax  * z_rMax); 
   TauR = GM_TauR * exp(SD_TauR  * z_TauR); 
-  
 }
 
 Dynamics { # ODEs
@@ -231,7 +235,7 @@ Dynamics { # ODEs
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact
   ## Time dependence of testing/contact tracting
-  TestingTimeDep = (1-1/(1+exp((t-TStartTesting)/TauTesting))); 
+  TestingTimeDep = (1-1/(1+exp((t-T50Testing)/TauTesting))); 
   ## Contact tracing
   FTraced = FTraced0 * TestingTimeDep;
   ## Testing
@@ -281,7 +285,7 @@ CalcOutputs {
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact
   ## Time dependence of testing/contact tracting
-  TestingTimeDep = (1-1/(1+exp((t-TStartTesting)/TauTesting))); 
+  TestingTimeDep = (1-1/(1+exp((t-T50Testing)/TauTesting))); 
   ## Contact tracing
   FTraced = FTraced0 * TestingTimeDep;
   ## Testing

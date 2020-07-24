@@ -82,31 +82,19 @@ make_jobfile <- function(state_abbr="TX",
 }
 
 # ## Prediction - Run through 6/20 with re-opening - state-specific priors
-# statenow <- "ALL"
-# restartdir<-""
-# useposterior <- FALSE
-# batchdir <- "SEIR.reopen.state.2020.06.20"
-# priorfile <- "SEIR.reopen_state_priors_MCMC.in.R"
-# X_iter <- "200000"
-# X_print <- "100"
-# domulticheck <- TRUE
-# valid <- TRUE
-# validdate <- "2020-06-20"
-# usemobility <- TRUE
-
-## Prediction - Run through 7/22 with re-opening - state-specific priors
 statenow <- "ALL"
 restartdir<-""
 useposterior <- FALSE
-batchdir <- "SEIR.reopen.state.2020.07.22"
+batchdir <- "SEIR.reopen.state.2020.06.20"
 priorfile <- "SEIR.reopen_state_priors_MCMC.in.R"
 X_iter <- "200000"
 X_print <- "100"
 domulticheck <- TRUE
 valid <- TRUE
-validdate <- "2020-07-22"
+validdate <- "2020-06-20"
 usemobility <- TRUE
-mobilityfile <- "MobilityParmsSummaryByState-2020-07-21.csv"
+mobilityfile <- "MobilityParmsSummaryByState.csv"
+
 ###################
 if (!dir.exists(batchdir)) system(paste("mkdir",batchdir))
 # Model file

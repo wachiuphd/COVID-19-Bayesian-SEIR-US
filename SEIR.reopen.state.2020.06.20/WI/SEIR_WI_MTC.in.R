@@ -11,27 +11,28 @@ Distrib(GM_c0, TruncNormal, 13, 5, 7, 20); # Average contacts/day
 Distrib(GM_TLatent, TruncNormal, 4, 1, 2, 7); # Latency
 Distrib(GM_TRecover, TruncLogNormal, 10, 1.5, 5, 30); # Time to recovery (no longer infectious)
 Distrib(GM_IFR, TruncLogNormal, 0.01, 2, 0.001, 0.1); # Infected fatality rate
-Distrib(GM_TStartTesting, TruncNormal, 90, 30, 60, 150); # Time of start of testing
-Distrib(GM_TauTesting, TruncNormal, 7, 3, 1, 14); # Time constant for testing
+Distrib(GM_T50Testing, TruncNormal, 120, 60, 60, 180); # Time of 50% of final testing rate
+Distrib(GM_TauTesting, TruncNormal, 21, 14, 1, 42); # Time constant for testing
 Distrib(GM_TTestingRate, TruncNormal, 7, 3, 2, 12);
 Distrib(GM_TContactsTestingRate, TruncNormal, 2, 1, 1, 3); 
-Distrib(GM_TestingCoverage, TruncNormal, 0.5, 0.2, 0.2, 0.8);
+Distrib(GM_FAsymp, TruncNormal, 0.295, 0.275, 0.02, 0.57); # Fraction asymptomatic
+Distrib(GM_TestingCoverage, Beta, 2, 2); # Testing coverage
 Distrib(GM_TestSensitivity, TruncNormal, 0.7, 0.1, 0.6, 0.95);
-Distrib(GM_ThetaMin, TruncNormal, 0.456, 0.26, 0, 0.805); # Minimum value for social distancing
-Distrib(GM_TauTheta, TruncNormal, 17.8, 1.57, 15.5, 19.8); # Characteristic time for social distancing
-Distrib(GM_PwrTheta, TruncNormal, 5.22, 1.62, 2.77, 7.42); # Power in Weibull model for social distancing
+Distrib(GM_ThetaMin, TruncNormal, 0.456, 0.26, 0, 1); # Minimum value for social distancing
+Distrib(GM_TauTheta, TruncNormal, 17.8, 1.57, 7, 35); # Characteristic time for social distancing
+Distrib(GM_PwrTheta, TruncNormal, 5.22, 1.62, 1, 11); # Power in Weibull model for social distancing
 Distrib(GM_HygienePwr, Beta, 2, 2); # Power in Weibull model for social distancing
 Distrib(GM_FracTraced, TruncLogNormal, 0.25, 2, 0.05, 1); # Fraction traced
 
 Distrib(GM_TPosTest, TruncLogNormal, 7, 2, 1, 14); # Reporting delay
 Distrib(GM_TFatalDeath, TruncLogNormal, 7, 2, 1, 14); # Time from fatal illness to death + reporting delay
 
-Distrib(GM_TauS, TruncNormal, 34.7, 11, 24.2, 59.8);
-Distrib(GM_rMax, TruncNormal, 0.607, 0.207, 0.279, 0.933);
-Distrib(GM_TauR, TruncNormal, 44, 9.61, 28.2, 56.1);
+Distrib(GM_TauS, TruncNormal, 34.7, 11, 0, 90);
+Distrib(GM_rMax, TruncNormal, 0.607, 0.207, 0, 2);
+Distrib(GM_TauR, TruncNormal, 44, 9.61, 0, 105);
 
-Distrib(alpha_Pos, LogUniform, 4, 40);
-Distrib(alpha_Death, LogUniform, 8, 40);
+Distrib(alpha_Pos, LogUniform, 0.1, 40);
+Distrib(alpha_Death, LogUniform, 0.1, 40);
 
     Simulation { # WI 
 
