@@ -199,6 +199,8 @@ plot_scenario <- function(alldat.df,out_quant,state_abbr="TX",
     ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
     labs(fill="",linetype="Prediction")+
     scale_x_date(date_minor_breaks = "1 day",
+                 date_breaks="1 month",
+                 date_labels = "%b",
                  limits=c(min(obsdat$date),as.Date(datemaxplot)))+
     facet_wrap(~Output_Var,scales="free",ncol=2,dir="v",
                labeller = labeller(Output_Var = obsnames)) +
