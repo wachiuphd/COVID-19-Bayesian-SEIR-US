@@ -32,7 +32,7 @@ scen.df$scenarioname <- "Validation"
 scen.df$scenariodesc <- "Validation"
 scennew.df<-data.frame()
 pdf(file=file.path(figuredir,"FigS4_ValidationResults.pdf"),height=4,width=6)
-for (j in 1:nrow(scen.df[1,])) {
+for (j in 1:nrow(scen.df)) {
   scenrow<-scen.df[j,]
   dat.df <- subset(alldat.df,state==scenrow$state)
   names(dat.df)[names(dat.df)=="variable"]<-"Output_Var"

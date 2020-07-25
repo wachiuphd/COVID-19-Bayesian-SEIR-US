@@ -22,7 +22,6 @@ val.prior.tmp.df <-
           keep.rownames = TRUE)
 names(val.prior.tmp.df)[1]<-"Parameter"
 val.prior.tmp.df$State.abbr <- "Pr"
-val.prior.tmp.df$Parameter[val.prior.tmp.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
 val.prior.tmp.df$Date <- "2020-04-30"
 val.prior.df <- data.frame()
 for (statenow in state_abbr) {
@@ -41,7 +40,6 @@ for (statenow in state_abbr) {
                           keep.rownames=TRUE)
   names(cal.prior.tmp.df)[1]<-"Parameter"
   cal.prior.tmp.df$State.abbr <- statenow
-  cal.prior.tmp.df$Parameter[cal.prior.tmp.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
   cal.prior.df <- rbind(cal.prior.df,cal.prior.tmp.df)
   
   pred.prior.tmp<-fread(file.path(pred.folder,statenow,paste0("SEIR_",statenow,"_MTC.out")))
@@ -51,7 +49,6 @@ for (statenow in state_abbr) {
                               keep.rownames=TRUE)
   names(pred.prior.tmp.df)[1]<-"Parameter"
   pred.prior.tmp.df$State.abbr <- statenow
-  pred.prior.tmp.df$Parameter[pred.prior.tmp.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
   pred.prior.df <- rbind(pred.prior.df,pred.prior.tmp.df)
 }
 cal.prior.df$Date <- "2020-06-20"
@@ -111,9 +108,6 @@ for (j in 1:length(val.csvfiles)) {
   parmdat.tmp$Parameter<-gsub(".1.","",parmdat.tmp$Parameter)
   pred.parmdat.df <- rbind(pred.parmdat.df,parmdat.tmp)
 }
-val.parmdat.df$Parameter[val.parmdat.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
-cal.parmdat.df$Parameter[cal.parmdat.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
-pred.parmdat.df$Parameter[pred.parmdat.df$Parameter=="GM_TStartTesting"]<-"GM_T50Testing"
 val.parmdat.df$Date <- "2020-04-30"
 cal.parmdat.df$Date <- "2020-06-20"
 pred.parmdat.df$Date <- "2020-07-22"
@@ -136,7 +130,7 @@ for (parmnow in parms) {
                      min=`2.5%`,max=`97.5%`,middle=`50%`,
                      fill=Type),stat="identity")+
     coord_flip()+
-    scale_fill_discrete(limits=c("Prior","Posterior"))+
+    scale_fill_viridis_d(limits=c("Prior","Posterior"))+
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(parmnow)+
     facet_wrap(~State.abbr)
@@ -147,7 +141,8 @@ for (parmnow in parms) {
 dev.off()
 
 pdf(file="Calib-Under-PriorPost.pdf",height=8,width=10)
-Calib_under_states <- c("AK","FL","HI","ID","LA","MT","SD","VT","WV")
+#Calib_under_states <- c("AK","FL","HI","ID","LA","MT","SD","VT","WV")
+Calib_under_states <- c("AK","HI","MT","SD","VT","WV")
 parms <- unique(pred.parmdat.df$Parameter)
 for (parmnow in parms) {
   priors <- rbind(subset(val.prior.df,Parameter==parmnow),
@@ -162,7 +157,7 @@ for (parmnow in parms) {
                      min=`2.5%`,max=`97.5%`,middle=`50%`,
                      fill=Type),stat="identity")+
     coord_flip()+
-    scale_fill_discrete(limits=c("Prior","Posterior"))+
+    scale_fill_viridis_d(limits=c("Prior","Posterior"))+
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(paste("Underpredicted States:",parmnow))+
     facet_wrap(~State.abbr)
@@ -173,7 +168,8 @@ for (parmnow in parms) {
 dev.off()
 
 pdf(file="Calib-Over-PriorPost.pdf",height=8,width=10)
-Calib_over_states <- c("IL","IN","IA","MA","MI","MN","OH","WY")
+#Calib_over_states <- c("IL","IN","IA","MA","MI","MN","OH","WY")
+Calib_over_states <- c("IL","IN","IA","KS","MI","MN","NE")
 parms <- unique(pred.parmdat.df$Parameter)
 for (parmnow in parms) {
   priors <- rbind(subset(val.prior.df,Parameter==parmnow),
@@ -188,7 +184,7 @@ for (parmnow in parms) {
                      min=`2.5%`,max=`97.5%`,middle=`50%`,
                      fill=Type),stat="identity")+
     coord_flip()+
-    scale_fill_discrete(limits=c("Prior","Posterior"))+
+    scale_fill_viridis_d(limits=c("Prior","Posterior"))+
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(paste("Overpredicted States:",parmnow))+
     facet_wrap(~State.abbr)
@@ -214,7 +210,7 @@ for (parmnow in parms) {
                      min=`2.5%`,max=`97.5%`,middle=`50%`,
                      fill=Type),stat="identity")+
     coord_flip()+
-    scale_fill_discrete(limits=c("Prior","Posterior"))+
+    scale_fill_viridis_d(limits=c("Prior","Posterior"))+
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(paste("Underpredicted 7/22 States:",parmnow))+
     facet_wrap(~State.abbr)
@@ -239,7 +235,7 @@ for (parmnow in parms) {
                      min=`2.5%`,max=`97.5%`,middle=`50%`,
                      fill=Type),stat="identity")+
     coord_flip()+
-    scale_fill_discrete(limits=c("Prior","Posterior"))+
+    scale_fill_viridis_d(limits=c("Prior","Posterior"))+
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(paste("Accurate 7/22 States:",parmnow))+
     facet_wrap(~State.abbr)
