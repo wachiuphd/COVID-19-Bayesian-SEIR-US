@@ -40,6 +40,7 @@ Outputs = {
   rho_C,
   delta,
   c,
+  cnorm,
   beta,
   Rt,
   Refft,
@@ -285,7 +286,8 @@ CalcOutputs {
   ReopenStop =  (1 - 1/(1 + exp(4*(t - (TimeReopen+TauR)))));
   ReopenFit = (t - TimeReopen)*(rMax/TauR)*(ReopenStart-ReopenStop)+rMax*ReopenStop;
   ## Contacts/day
-  c = c0 * (ThetaFit + (1 - ThetaMin) * ReopenFit); 
+  cnorm = (ThetaFit + (1 - ThetaMin) * ReopenFit);
+  c = c0 * cnorm; 
   ## Hygiene - reduce infection probability/infected contact
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact

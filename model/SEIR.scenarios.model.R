@@ -40,6 +40,7 @@ Outputs = {
   rho_C,
   delta,
   c,
+  cnorm,
   beta,
   Rt,
   Refft,
@@ -305,6 +306,7 @@ CalcOutputs {
   ReopenFitTmp = ((t - TimeReopen)*(rMax/TauR)*(ReopenStart-ReopenStop)+rMax*ReopenStop);
   ## Contacts/day
   ctmp = c0 * (ThetaFit + (1 - ThetaMin) * ReopenFitTmp); 
+  ctmpnorm = (ThetaFit + (1 - ThetaMin) * ReopenFit);
   ## Hygiene - reduce infection probability/infected contact
   HygieneFit = pow(ThetaFit, HygienePwr);
   beta = beta0 * HygieneFit; # infection probability/infected contact
@@ -317,6 +319,7 @@ CalcOutputs {
                   (pow(ThetaFit,1+HygienePwr)-pow(ThetaMin,1+HygienePwr)))/
                  ((1-ThetaMin)*pow(ThetaFit,HygienePwr)));
   c = (DeltaDelta > -1) ? (c0 * (ThetaFit + (1 - ThetaMin) * ReopenFit)) : ctmp; 
+  cnorm = (DeltaDelta > -1) ? (ThetaFit + (1 - ThetaMin) * ReopenFit) : ctmpnorm; 
   ## Time dependence of testing/contact tracting
   TestingTimeDep = (1-1/(1+exp((t-T50Testing)/TauTesting))); 
   ## Contact tracing
