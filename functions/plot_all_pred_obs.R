@@ -79,15 +79,15 @@ cumpreddatemax <- "2020-08-31"
 # novalid <- FALSE
 # validdate <- "2020-06-20"
 
-folder <- "SEIR.reopen.2020.04.30"
-calibdate <- "2020-04-30"
-novalid <- FALSE
-validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.state.2020.07.22"
-# calibdate <- "2020-07-22"
+# folder <- "SEIR.reopen.2020.04.30"
+# calibdate <- "2020-04-30"
 # novalid <- FALSE
-# validdate <- "2020-07-22"
+# validdate <- "2020-06-20"
+
+folder <- "SEIR.reopen.state.2020.07.22"
+calibdate <- "2020-07-22"
+novalid <- FALSE
+validdate <- "2020-07-22"
 
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
