@@ -21,15 +21,15 @@ Distrib(GM_TestSensitivity, TruncNormal, 0.7, 0.1, 0.6, 0.95);
 Distrib(GM_ThetaMin, Beta, 2, 2); # Minimum value for social distancing
 Distrib(GM_TauTheta, TruncNormal, 21, 7, 7, 35); # Characteristic time for social distancing
 Distrib(GM_PwrTheta, TruncNormal, 6, 2, 1, 11); # Power in Weibull model for social distancing
-Distrib(GM_HygienePwr, Beta, 2, 2); # Power in Weibull model for social distancing
+Distrib(GM_HygienePwr, Beta, 2, 4); # Power in Weibull model for social distancing
 Distrib(GM_FracTraced, TruncLogNormal, 0.25, 2, 0.05, 1); # Fraction traced
 
 Distrib(GM_TPosTest, TruncLogNormal, 7, 2, 1, 14); # Reporting delay
 Distrib(GM_TFatalDeath, TruncLogNormal, 7, 2, 1, 14); # Time from fatal illness to death + reporting delay
 
-Distrib(GM_TauS, TruncNormal, 30, 30, 0, 90);
+Distrib(GM_TauS, TruncNormal, 45, 30, 21, 90);
 Distrib(GM_rMax, TruncNormal, 1, 1, 0, 2);
-Distrib(GM_TauR, TruncNormal, 45, 30, 0, 105);
+Distrib(GM_TauR, TruncNormal, 45, 30, 14, 105);
 
 Distrib(alpha_Pos, LogUniform, 0.1, 40);
 Distrib(alpha_Death, LogUniform, 0.1, 40);

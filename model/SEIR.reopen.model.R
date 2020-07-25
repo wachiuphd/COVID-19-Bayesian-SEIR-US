@@ -12,7 +12,9 @@ States = {
   E, # Exposed (not infectious)
   E_C, # Exposed (not infectious), contact traced/isolated
   I_U, # Infected, untested
+  A_U, # Asymptomatic, infectious, untested
   I_C, # Infected, untested, contact traced/isolated
+  A_C, # Asymptomatic, infectious, contact traced/isolated
   R_U, # Recovered, untested
   I_T, # Infected, tested
   R_T, # Recovered, tested
@@ -207,8 +209,8 @@ Initialize {
   alpha = 1/TIsolation;
   kappa = 1/TLatent;
   rho = 1/TRecover;
-  lambda0 = (1 - FAsymp)*TestingCoverage*TestSensitivity/TTestingRate;
-  lambda0_C = (1 - FAsymp)*1.0*TestSensitivity/TContactsTestingRate;
+  lambda0 = TestingCoverage*TestSensitivity/TTestingRate;
+  lambda0_C = 1.0*TestSensitivity/TContactsTestingRate;
   rho0_C = 1.0*(1.0 - TestSensitivity)/TContactsTestingRate;
   beta0 = R0 * rho / c0;
   # State parameter initialization
@@ -248,16 +250,19 @@ Dynamics { # ODEs
   CFR = (fracpos > fracposmin) ? IFR/fracpos : 0.9; # Adjust infected fatality to (tested) case fatality
   delta = rho * CFR/(1-CFR);
   # Susceptibles
-  dt(S) = -S * c * I_U * (beta + (1 - beta) * FTraced) + S_C * alpha;
-  dt(S_C) = -S_C * alpha + S * c * I_U * (1 - beta) * FTraced;
+  dt(S) = -S * c * (I_U + A_U) * (beta + (1 - beta) * FTraced) + S_C * alpha;
+  dt(S_C) = -S_C * alpha + S * c * (I_U + A_U) * (1 - beta) * FTraced;
   # Exposed
-  dt(E) = -E * kappa + S * c * I_U * beta * (1 - FTraced);
-  dt(E_C) = -E_C * kappa + S * c * I_U * beta * FTraced;
+  dt(E) = -E * kappa + S * c * (I_U + A_U) * beta * (1 - FTraced);
+  dt(E_C) = -E_C * kappa + S * c * (I_U + A_U) * beta * FTraced;
   # Infected, not tested
-  dt(I_U) = -I_U * (lambda + rho) + E * kappa;
-  dt(I_C) = -I_C * (lambda_C + rho_C) + E_C * kappa;
+  dt(I_U) = -I_U * (lambda + rho) + E * kappa * (1 - FAsymp);
+  dt(I_C) = -I_C * (lambda_C + rho_C) + E_C * kappa * (1 - FAsymp);
+  # Asymptomatic, not tested, never tested
+  dt(A_U) = -A_U * rho + E * kappa * FAsymp;
+  dt(A_C) = -A_C * rho + E_C * kappa * FAsymp;
   # Recovered, not tested
-  dt(R_U) = I_U * rho + I_C * rho_C;
+  dt(R_U) = I_U * rho + I_C * rho_C + A_U * rho + A_C * rho;
   # Infected, tested
   dt(I_T) = -I_T * (rho + delta) + I_U * lambda + I_C * lambda_C;
   # Recovered, tested
@@ -318,7 +323,7 @@ CalcOutputs {
   p_N_pos = N_pos/(alpha_Pos+N_pos);
   p_D_pos = D_pos/(alpha_Death+D_pos);
   # Mass balance
-  Tot = S + S_C + E + E_C + I_U + I_C + R_U + I_T + R_T + F_T;
+  Tot = S + S_C + E + E_C + I_U + I_C + A_U + A_C + R_U + I_T + R_T + F_T;
 }
 
 End.

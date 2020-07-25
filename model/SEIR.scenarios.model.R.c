@@ -1,11 +1,11 @@
-/* model/SEIR.scenarios.model.R.c
+/* ../model/SEIR.scenarios.model.R.c
    ___________________________________________________
 
-   Model File:  model/SEIR.scenarios.model.R
+   Model File:  ../model/SEIR.scenarios.model.R
 
-   Date:  Sat Jul 25 16:08:10 2020
+   Date:  Sat Jul 25 17:07:37 2020
 
-   Created by:  "MCSim/mod.exe v6.1.0"
+   Created by:  "../MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
    ___________________________________________________
 
@@ -13,13 +13,15 @@
 
    Model calculations for compartmental model:
 
-   13 States:
+   15 States:
      S -> 0.0;
      S_C -> 0.0;
      E -> 0.0;
      E_C -> 0.0;
      I_U -> 0.0;
+     A_U -> 0.0;
      I_C -> 0.0;
+     A_C -> 0.0;
      R_U -> 0.0;
      I_T -> 0.0;
      R_T -> 0.0;
@@ -184,35 +186,37 @@
 #define ID_E 0x00002
 #define ID_E_C 0x00003
 #define ID_I_U 0x00004
-#define ID_I_C 0x00005
-#define ID_R_U 0x00006
-#define ID_I_T 0x00007
-#define ID_R_T 0x00008
-#define ID_F_T 0x00009
-#define ID_CumInfected 0x0000a
-#define ID_CPosTest_U 0x0000b
-#define ID_CPosTest_C 0x0000c
-#define ID_ThetaFit 0x0000d
-#define ID_HygieneFit 0x0000e
-#define ID_FTraced 0x0000f
-#define ID_lambda 0x00010
-#define ID_lambda_C 0x00011
-#define ID_rho_C 0x00012
-#define ID_delta 0x00013
-#define ID_c 0x00014
-#define ID_beta 0x00015
-#define ID_Rt 0x00016
-#define ID_Refft 0x00017
-#define ID_dtCumInfected 0x00018
-#define ID_dtCumPosTest 0x00019
-#define ID_dtCumDeath 0x0001a
-#define ID_CumPosTest 0x0001b
-#define ID_CumDeath 0x0001c
-#define ID_N_pos 0x0001d
-#define ID_D_pos 0x0001e
-#define ID_p_N_pos 0x0001f
-#define ID_p_D_pos 0x00020
-#define ID_Tot 0x00021
+#define ID_A_U 0x00005
+#define ID_I_C 0x00006
+#define ID_A_C 0x00007
+#define ID_R_U 0x00008
+#define ID_I_T 0x00009
+#define ID_R_T 0x0000a
+#define ID_F_T 0x0000b
+#define ID_CumInfected 0x0000c
+#define ID_CPosTest_U 0x0000d
+#define ID_CPosTest_C 0x0000e
+#define ID_ThetaFit 0x0000f
+#define ID_HygieneFit 0x00010
+#define ID_FTraced 0x00011
+#define ID_lambda 0x00012
+#define ID_lambda_C 0x00013
+#define ID_rho_C 0x00014
+#define ID_delta 0x00015
+#define ID_c 0x00016
+#define ID_beta 0x00017
+#define ID_Rt 0x00018
+#define ID_Refft 0x00019
+#define ID_dtCumInfected 0x0001a
+#define ID_dtCumPosTest 0x0001b
+#define ID_dtCumDeath 0x0001c
+#define ID_CumPosTest 0x0001d
+#define ID_CumDeath 0x0001e
+#define ID_N_pos 0x0001f
+#define ID_D_pos 0x00020
+#define ID_p_N_pos 0x00021
+#define ID_p_D_pos 0x00022
+#define ID_Tot 0x00023
 
 /* Inputs */
 #define ID_MuLambda 0x00000
@@ -220,133 +224,133 @@
 #define ID_DeltaDelta 0x00002
 
 /* Parameters */
-#define ID_Npop 0x00025
-#define ID_NInit 0x00026
-#define ID_TIsolation 0x00027
-#define ID_R0 0x00028
-#define ID_c0 0x00029
-#define ID_TLatent 0x0002a
-#define ID_TRecover 0x0002b
-#define ID_IFR 0x0002c
-#define ID_T50Testing 0x0002d
-#define ID_TauTesting 0x0002e
-#define ID_TTestingRate 0x0002f
-#define ID_TContactsTestingRate 0x00030
-#define ID_FAsymp 0x00031
-#define ID_TestingCoverage 0x00032
-#define ID_TestSensitivity 0x00033
-#define ID_ThetaMin 0x00034
-#define ID_TauTheta 0x00035
-#define ID_PwrTheta 0x00036
-#define ID_HygienePwr 0x00037
-#define ID_FTraced0 0x00038
-#define ID_TPosTest 0x00039
-#define ID_TFatalDeath 0x0003a
-#define ID_alpha 0x0003b
-#define ID_kappa 0x0003c
-#define ID_rho 0x0003d
-#define ID_lambda0 0x0003e
-#define ID_lambda0_C 0x0003f
-#define ID_rho0_C 0x00040
-#define ID_beta0 0x00041
-#define ID_TauS 0x00042
-#define ID_rMax 0x00043
-#define ID_TauR 0x00044
-#define ID_alpha_Pos 0x00045
-#define ID_alpha_Death 0x00046
-#define ID_GM_NInit 0x00047
-#define ID_GM_TIsolation 0x00048
-#define ID_GM_R0 0x00049
-#define ID_GM_c0 0x0004a
-#define ID_GM_TLatent 0x0004b
-#define ID_GM_TRecover 0x0004c
-#define ID_GM_IFR 0x0004d
-#define ID_GM_T50Testing 0x0004e
-#define ID_GM_TauTesting 0x0004f
-#define ID_GM_TTestingRate 0x00050
-#define ID_GM_TContactsTestingRate 0x00051
-#define ID_GM_FAsymp 0x00052
-#define ID_GM_TestingCoverage 0x00053
-#define ID_GM_TestSensitivity 0x00054
-#define ID_GM_ThetaMin 0x00055
-#define ID_GM_TauTheta 0x00056
-#define ID_GM_PwrTheta 0x00057
-#define ID_GM_HygienePwr 0x00058
-#define ID_GM_FracTraced 0x00059
-#define ID_GM_TPosTest 0x0005a
-#define ID_GM_TFatalDeath 0x0005b
-#define ID_GM_TauS 0x0005c
-#define ID_GM_rMax 0x0005d
-#define ID_GM_TauR 0x0005e
-#define ID_SD_NInit 0x0005f
-#define ID_SD_TIsolation 0x00060
-#define ID_SD_R0 0x00061
-#define ID_SD_c0 0x00062
-#define ID_SD_TLatent 0x00063
-#define ID_SD_TRecover 0x00064
-#define ID_SD_IFR 0x00065
-#define ID_SD_T50Testing 0x00066
-#define ID_SD_TauTesting 0x00067
-#define ID_SD_TTestingRate 0x00068
-#define ID_SD_TContactsTestingRate 0x00069
-#define ID_SD_FAsymp 0x0006a
-#define ID_SD_TestingCoverage 0x0006b
-#define ID_SD_TestSensitivity 0x0006c
-#define ID_SD_ThetaMin 0x0006d
-#define ID_SD_TauTheta 0x0006e
-#define ID_SD_PwrTheta 0x0006f
-#define ID_SD_HygienePwr 0x00070
-#define ID_SD_FracTraced 0x00071
-#define ID_SD_TPosTest 0x00072
-#define ID_SD_TFatalDeath 0x00073
-#define ID_SD_TauS 0x00074
-#define ID_SD_rMax 0x00075
-#define ID_SD_TauR 0x00076
-#define ID_z_NInit 0x00077
-#define ID_z_TIsolation 0x00078
-#define ID_z_R0 0x00079
-#define ID_z_c0 0x0007a
-#define ID_z_TLatent 0x0007b
-#define ID_z_TRecover 0x0007c
-#define ID_z_IFR 0x0007d
-#define ID_z_T50Testing 0x0007e
-#define ID_z_TauTesting 0x0007f
-#define ID_z_TTestingRate 0x00080
-#define ID_z_TContactsTestingRate 0x00081
-#define ID_z_FAsymp 0x00082
-#define ID_z_TestingCoverage 0x00083
-#define ID_z_TestSensitivity 0x00084
-#define ID_z_ThetaMin 0x00085
-#define ID_z_TauTheta 0x00086
-#define ID_z_PwrTheta 0x00087
-#define ID_z_HygienePwr 0x00088
-#define ID_z_FracTraced 0x00089
-#define ID_z_TPosTest 0x0008a
-#define ID_z_TFatalDeath 0x0008b
-#define ID_z_TauS 0x0008c
-#define ID_z_rMax 0x0008d
-#define ID_z_TauR 0x0008e
+#define ID_Npop 0x00027
+#define ID_NInit 0x00028
+#define ID_TIsolation 0x00029
+#define ID_R0 0x0002a
+#define ID_c0 0x0002b
+#define ID_TLatent 0x0002c
+#define ID_TRecover 0x0002d
+#define ID_IFR 0x0002e
+#define ID_T50Testing 0x0002f
+#define ID_TauTesting 0x00030
+#define ID_TTestingRate 0x00031
+#define ID_TContactsTestingRate 0x00032
+#define ID_FAsymp 0x00033
+#define ID_TestingCoverage 0x00034
+#define ID_TestSensitivity 0x00035
+#define ID_ThetaMin 0x00036
+#define ID_TauTheta 0x00037
+#define ID_PwrTheta 0x00038
+#define ID_HygienePwr 0x00039
+#define ID_FTraced0 0x0003a
+#define ID_TPosTest 0x0003b
+#define ID_TFatalDeath 0x0003c
+#define ID_alpha 0x0003d
+#define ID_kappa 0x0003e
+#define ID_rho 0x0003f
+#define ID_lambda0 0x00040
+#define ID_lambda0_C 0x00041
+#define ID_rho0_C 0x00042
+#define ID_beta0 0x00043
+#define ID_TauS 0x00044
+#define ID_rMax 0x00045
+#define ID_TauR 0x00046
+#define ID_alpha_Pos 0x00047
+#define ID_alpha_Death 0x00048
+#define ID_GM_NInit 0x00049
+#define ID_GM_TIsolation 0x0004a
+#define ID_GM_R0 0x0004b
+#define ID_GM_c0 0x0004c
+#define ID_GM_TLatent 0x0004d
+#define ID_GM_TRecover 0x0004e
+#define ID_GM_IFR 0x0004f
+#define ID_GM_T50Testing 0x00050
+#define ID_GM_TauTesting 0x00051
+#define ID_GM_TTestingRate 0x00052
+#define ID_GM_TContactsTestingRate 0x00053
+#define ID_GM_FAsymp 0x00054
+#define ID_GM_TestingCoverage 0x00055
+#define ID_GM_TestSensitivity 0x00056
+#define ID_GM_ThetaMin 0x00057
+#define ID_GM_TauTheta 0x00058
+#define ID_GM_PwrTheta 0x00059
+#define ID_GM_HygienePwr 0x0005a
+#define ID_GM_FracTraced 0x0005b
+#define ID_GM_TPosTest 0x0005c
+#define ID_GM_TFatalDeath 0x0005d
+#define ID_GM_TauS 0x0005e
+#define ID_GM_rMax 0x0005f
+#define ID_GM_TauR 0x00060
+#define ID_SD_NInit 0x00061
+#define ID_SD_TIsolation 0x00062
+#define ID_SD_R0 0x00063
+#define ID_SD_c0 0x00064
+#define ID_SD_TLatent 0x00065
+#define ID_SD_TRecover 0x00066
+#define ID_SD_IFR 0x00067
+#define ID_SD_T50Testing 0x00068
+#define ID_SD_TauTesting 0x00069
+#define ID_SD_TTestingRate 0x0006a
+#define ID_SD_TContactsTestingRate 0x0006b
+#define ID_SD_FAsymp 0x0006c
+#define ID_SD_TestingCoverage 0x0006d
+#define ID_SD_TestSensitivity 0x0006e
+#define ID_SD_ThetaMin 0x0006f
+#define ID_SD_TauTheta 0x00070
+#define ID_SD_PwrTheta 0x00071
+#define ID_SD_HygienePwr 0x00072
+#define ID_SD_FracTraced 0x00073
+#define ID_SD_TPosTest 0x00074
+#define ID_SD_TFatalDeath 0x00075
+#define ID_SD_TauS 0x00076
+#define ID_SD_rMax 0x00077
+#define ID_SD_TauR 0x00078
+#define ID_z_NInit 0x00079
+#define ID_z_TIsolation 0x0007a
+#define ID_z_R0 0x0007b
+#define ID_z_c0 0x0007c
+#define ID_z_TLatent 0x0007d
+#define ID_z_TRecover 0x0007e
+#define ID_z_IFR 0x0007f
+#define ID_z_T50Testing 0x00080
+#define ID_z_TauTesting 0x00081
+#define ID_z_TTestingRate 0x00082
+#define ID_z_TContactsTestingRate 0x00083
+#define ID_z_FAsymp 0x00084
+#define ID_z_TestingCoverage 0x00085
+#define ID_z_TestSensitivity 0x00086
+#define ID_z_ThetaMin 0x00087
+#define ID_z_TauTheta 0x00088
+#define ID_z_PwrTheta 0x00089
+#define ID_z_HygienePwr 0x0008a
+#define ID_z_FracTraced 0x0008b
+#define ID_z_TPosTest 0x0008c
+#define ID_z_TFatalDeath 0x0008d
+#define ID_z_TauS 0x0008e
+#define ID_z_rMax 0x0008f
+#define ID_z_TauR 0x00090
 
 
 /*----- Global Variables */
 
 /* For export. Keep track of who we are. */
-char szModelDescFilename[] = "model/SEIR.scenarios.model.R";
+char szModelDescFilename[] = "../model/SEIR.scenarios.model.R";
 char szModelSourceFilename[] = __FILE__;
-char szModelGenAndVersion[] = "MCSim/mod.exe v6.1.0";
+char szModelGenAndVersion[] = "../MCSim/mod.exe v6.1.0";
 
 /* Externs */
 extern BOOL vbModelReinitd;
 
 /* Model Dimensions */
-int vnStates = 13;
+int vnStates = 15;
 int vnOutputs = 21;
-int vnModelVars = 34;
+int vnModelVars = 36;
 int vnInputs = 3;
 int vnParms = 106;
 
 /* States and Outputs*/
-double vrgModelVars[34];
+double vrgModelVars[36];
 
 /* Inputs */
 IFN vrgInputs[3];
@@ -470,7 +474,9 @@ VMMAPSTRCT vrgvmGlo[] = {
   {"E", (PVOID) &vrgModelVars[ID_E], ID_STATE | ID_E},
   {"E_C", (PVOID) &vrgModelVars[ID_E_C], ID_STATE | ID_E_C},
   {"I_U", (PVOID) &vrgModelVars[ID_I_U], ID_STATE | ID_I_U},
+  {"A_U", (PVOID) &vrgModelVars[ID_A_U], ID_STATE | ID_A_U},
   {"I_C", (PVOID) &vrgModelVars[ID_I_C], ID_STATE | ID_I_C},
+  {"A_C", (PVOID) &vrgModelVars[ID_A_C], ID_STATE | ID_A_C},
   {"R_U", (PVOID) &vrgModelVars[ID_R_U], ID_STATE | ID_R_U},
   {"I_T", (PVOID) &vrgModelVars[ID_I_T], ID_STATE | ID_I_T},
   {"R_T", (PVOID) &vrgModelVars[ID_R_T], ID_STATE | ID_R_T},
@@ -629,7 +635,9 @@ void InitModel(void)
   vrgModelVars[ID_E] = 0.0;
   vrgModelVars[ID_E_C] = 0.0;
   vrgModelVars[ID_I_U] = 0.0;
+  vrgModelVars[ID_A_U] = 0.0;
   vrgModelVars[ID_I_C] = 0.0;
+  vrgModelVars[ID_A_C] = 0.0;
   vrgModelVars[ID_R_U] = 0.0;
   vrgModelVars[ID_I_T] = 0.0;
   vrgModelVars[ID_R_T] = 0.0;
@@ -889,19 +897,23 @@ void CalcDeriv (double  rgModelVars[], double  rgDerivs[], PDOUBLE pdTime)
 
   rgModelVars[ID_delta] = rho * CFR / ( 1 - CFR ) ;
 
-  rgDerivs[ID_S] = - rgModelVars[ID_S] * rgModelVars[ID_c] * rgModelVars[ID_I_U] * ( rgModelVars[ID_beta] + ( 1 - rgModelVars[ID_beta] ) * rgModelVars[ID_FTraced] ) + rgModelVars[ID_S_C] * alpha ;
+  rgDerivs[ID_S] = - rgModelVars[ID_S] * rgModelVars[ID_c] * ( rgModelVars[ID_I_U] + rgModelVars[ID_A_U] ) * ( rgModelVars[ID_beta] + ( 1 - rgModelVars[ID_beta] ) * rgModelVars[ID_FTraced] ) + rgModelVars[ID_S_C] * alpha ;
 
-  rgDerivs[ID_S_C] = - rgModelVars[ID_S_C] * alpha + rgModelVars[ID_S] * rgModelVars[ID_c] * rgModelVars[ID_I_U] * ( 1 - rgModelVars[ID_beta] ) * rgModelVars[ID_FTraced] ;
+  rgDerivs[ID_S_C] = - rgModelVars[ID_S_C] * alpha + rgModelVars[ID_S] * rgModelVars[ID_c] * ( rgModelVars[ID_I_U] + rgModelVars[ID_A_U] ) * ( 1 - rgModelVars[ID_beta] ) * rgModelVars[ID_FTraced] ;
 
-  rgDerivs[ID_E] = - rgModelVars[ID_E] * kappa + rgModelVars[ID_S] * rgModelVars[ID_c] * rgModelVars[ID_I_U] * rgModelVars[ID_beta] * ( 1 - rgModelVars[ID_FTraced] ) ;
+  rgDerivs[ID_E] = - rgModelVars[ID_E] * kappa + rgModelVars[ID_S] * rgModelVars[ID_c] * ( rgModelVars[ID_I_U] + rgModelVars[ID_A_U] ) * rgModelVars[ID_beta] * ( 1 - rgModelVars[ID_FTraced] ) ;
 
-  rgDerivs[ID_E_C] = - rgModelVars[ID_E_C] * kappa + rgModelVars[ID_S] * rgModelVars[ID_c] * rgModelVars[ID_I_U] * rgModelVars[ID_beta] * rgModelVars[ID_FTraced] ;
+  rgDerivs[ID_E_C] = - rgModelVars[ID_E_C] * kappa + rgModelVars[ID_S] * rgModelVars[ID_c] * ( rgModelVars[ID_I_U] + rgModelVars[ID_A_U] ) * rgModelVars[ID_beta] * rgModelVars[ID_FTraced] ;
 
-  rgDerivs[ID_I_U] = - rgModelVars[ID_I_U] * ( rgModelVars[ID_lambda] + rho ) + rgModelVars[ID_E] * kappa ;
+  rgDerivs[ID_I_U] = - rgModelVars[ID_I_U] * ( rgModelVars[ID_lambda] + rho ) + rgModelVars[ID_E] * kappa * ( 1 - FAsymp ) ;
 
-  rgDerivs[ID_I_C] = - rgModelVars[ID_I_C] * ( rgModelVars[ID_lambda_C] + rgModelVars[ID_rho_C] ) + rgModelVars[ID_E_C] * kappa ;
+  rgDerivs[ID_I_C] = - rgModelVars[ID_I_C] * ( rgModelVars[ID_lambda_C] + rgModelVars[ID_rho_C] ) + rgModelVars[ID_E_C] * kappa * ( 1 - FAsymp ) ;
 
-  rgDerivs[ID_R_U] = rgModelVars[ID_I_U] * rho + rgModelVars[ID_I_C] * rgModelVars[ID_rho_C] ;
+  rgDerivs[ID_A_U] = - rgModelVars[ID_A_U] * rho + rgModelVars[ID_E] * kappa * FAsymp ;
+
+  rgDerivs[ID_A_C] = - rgModelVars[ID_A_C] * rho + rgModelVars[ID_E_C] * kappa * FAsymp ;
+
+  rgDerivs[ID_R_U] = rgModelVars[ID_I_U] * rho + rgModelVars[ID_I_C] * rgModelVars[ID_rho_C] + rgModelVars[ID_A_U] * rho + rgModelVars[ID_A_C] * rho ;
 
   rgDerivs[ID_I_T] = - rgModelVars[ID_I_T] * ( rho + rgModelVars[ID_delta] ) + rgModelVars[ID_I_U] * rgModelVars[ID_lambda] + rgModelVars[ID_I_C] * rgModelVars[ID_lambda_C] ;
 
@@ -957,8 +969,8 @@ void ScaleModel (PDOUBLE pdTime)
   alpha = 1 / TIsolation ;
   kappa = 1 / TLatent ;
   rho = 1 / TRecover ;
-  lambda0 = ( 1 - FAsymp ) * TestingCoverage * TestSensitivity / TTestingRate ;
-  lambda0_C = ( 1 - FAsymp ) * 1.0 * TestSensitivity / TContactsTestingRate ;
+  lambda0 = TestingCoverage * TestSensitivity / TTestingRate ;
+  lambda0_C = 1.0 * TestSensitivity / TContactsTestingRate ;
   rho0_C = 1.0 * ( 1.0 - TestSensitivity ) / TContactsTestingRate ;
   beta0 = R0 * rho / c0 ;
 
@@ -1059,7 +1071,7 @@ void CalcOutputs (double  rgModelVars[], double  rgDerivs[], PDOUBLE pdTime)
   rgModelVars[ID_p_N_pos] = rgModelVars[ID_N_pos] / ( alpha_Pos + rgModelVars[ID_N_pos] ) ;
   rgModelVars[ID_p_D_pos] = rgModelVars[ID_D_pos] / ( alpha_Death + rgModelVars[ID_D_pos] ) ;
 
-  rgModelVars[ID_Tot] = rgModelVars[ID_S] + rgModelVars[ID_S_C] + rgModelVars[ID_E] + rgModelVars[ID_E_C] + rgModelVars[ID_I_U] + rgModelVars[ID_I_C] + rgModelVars[ID_R_U] + rgModelVars[ID_I_T] + rgModelVars[ID_R_T] + rgModelVars[ID_F_T] ;
+  rgModelVars[ID_Tot] = rgModelVars[ID_S] + rgModelVars[ID_S_C] + rgModelVars[ID_E] + rgModelVars[ID_E_C] + rgModelVars[ID_I_U] + rgModelVars[ID_I_C] + rgModelVars[ID_A_U] + rgModelVars[ID_A_C] + rgModelVars[ID_R_U] + rgModelVars[ID_I_T] + rgModelVars[ID_R_T] + rgModelVars[ID_F_T] ;
 
 }  /* CalcOutputs */
 

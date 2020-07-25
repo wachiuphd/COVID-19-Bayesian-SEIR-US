@@ -67,7 +67,8 @@ make_diagnostic <- function(out_dat, dat.df, cumdat.df, burnin=0.1,
   p3<-ggplot(subset(check_mcmc,Output_Var == "S" |
                        Output_Var == "E" |
                        Output_Var == "I_U" | 
-                       Output_Var == "R_U"))+
+                      Output_Var == "A_U" | 
+                      Output_Var == "R_U"))+
     geom_line(aes(x=Time,y=Prediction*popnow,color=Output_Var))+
     geom_vline(xintercept = numdatemax)+
     facet_wrap(~Output_Var,nrow=2,scales="free")

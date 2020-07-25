@@ -120,7 +120,7 @@ ggplot(states_S.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log
 states_E.df <- melt(out_dat[,c("Time","E","E_C")],id.vars=1)
 ggplot(states_E.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
 
-states_I.df <- melt(out_dat[,c("Time","I_U","I_C","I_T")],id.vars=1)
+states_I.df <- melt(out_dat[,c("Time","I_U","I_C","I_T","A_U","A_C")],id.vars=1)
 ggplot(states_I.df,aes(x=Time,y=value,color=variable))+geom_line() + scale_y_log10()+facet_wrap(~variable)+theme(legend.position = "none")
 
 states_R.df <- melt(out_dat[,c("Time","R_U","R_T","F_T")],id.vars=1)

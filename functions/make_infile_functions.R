@@ -34,6 +34,7 @@ make_infile_template <- function(alldat.df,
   statevars <- c("S","S_C",
                  "E","E_C",
                  "I_U","I_C","I_T",
+                 "A_U","A_C",
                  "R_U","R_T","F_T");
   timedepvars <- c(
     "ThetaFit",
