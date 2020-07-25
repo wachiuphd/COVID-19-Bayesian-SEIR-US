@@ -1,11 +1,11 @@
-/* model/SEIR.reopen.model.R.c
+/* ../model/SEIR.reopen.model.R.c
    ___________________________________________________
 
-   Model File:  model/SEIR.reopen.model.R
+   Model File:  ../model/SEIR.reopen.model.R
 
-   Date:  Fri Jul 24 16:09:27 2020
+   Date:  Sat Jul 25 07:42:33 2020
 
-   Created by:  "MCSim/mod.exe v6.1.0"
+   Created by:  "../MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
    ___________________________________________________
 
@@ -95,23 +95,23 @@
      GM_TLatent = 4;
      GM_TRecover = 10;
      GM_IFR = 0.01;
-     GM_T50Testing = 70;
-     GM_TauTesting = 3;
+     GM_T50Testing = 120;
+     GM_TauTesting = 21;
      GM_TTestingRate = 7;
      GM_TContactsTestingRate = 2;
-     GM_FAsymp = 0.5;
+     GM_FAsymp = 0.295;
      GM_TestingCoverage = 0.5;
      GM_TestSensitivity = 0.7;
      GM_ThetaMin = 0.44;
-     GM_TauTheta = 18;
-     GM_PwrTheta = 4.4;
+     GM_TauTheta = 21;
+     GM_PwrTheta = 6;
      GM_HygienePwr = 0.25;
-     GM_FracTraced = 0.1;
-     GM_TPosTest = 3;
-     GM_TFatalDeath = 3;
-     GM_TauS = 33;
+     GM_FracTraced = 0.25;
+     GM_TPosTest = 7;
+     GM_TFatalDeath = 7;
+     GM_TauS = 45;
      GM_rMax = 0.53;
-     GM_TauR = 44;
+     GM_TauR = 45;
      SD_NInit = 0;
      SD_TIsolation = 0;
      SD_R0 = 0;
@@ -325,9 +325,9 @@
 /*----- Global Variables */
 
 /* For export. Keep track of who we are. */
-char szModelDescFilename[] = "model/SEIR.reopen.model.R";
+char szModelDescFilename[] = "../model/SEIR.reopen.model.R";
 char szModelSourceFilename[] = __FILE__;
-char szModelGenAndVersion[] = "MCSim/mod.exe v6.1.0";
+char szModelGenAndVersion[] = "../MCSim/mod.exe v6.1.0";
 
 /* Externs */
 extern BOOL vbModelReinitd;
@@ -690,23 +690,23 @@ void InitModel(void)
   GM_TLatent = 4;
   GM_TRecover = 10;
   GM_IFR = 0.01;
-  GM_T50Testing = 70;
-  GM_TauTesting = 3;
+  GM_T50Testing = 120;
+  GM_TauTesting = 21;
   GM_TTestingRate = 7;
   GM_TContactsTestingRate = 2;
-  GM_FAsymp = 0.5;
+  GM_FAsymp = 0.295;
   GM_TestingCoverage = 0.5;
   GM_TestSensitivity = 0.7;
   GM_ThetaMin = 0.44;
-  GM_TauTheta = 18;
-  GM_PwrTheta = 4.4;
+  GM_TauTheta = 21;
+  GM_PwrTheta = 6;
   GM_HygienePwr = 0.25;
-  GM_FracTraced = 0.1;
-  GM_TPosTest = 3;
-  GM_TFatalDeath = 3;
-  GM_TauS = 33;
+  GM_FracTraced = 0.25;
+  GM_TPosTest = 7;
+  GM_TFatalDeath = 7;
+  GM_TauS = 45;
   GM_rMax = 0.53;
-  GM_TauR = 44;
+  GM_TauR = 45;
   SD_NInit = 0;
   SD_TIsolation = 0;
   SD_R0 = 0;

@@ -102,23 +102,23 @@ GM_c0 = 13; # Contacts/day
 GM_TLatent = 4; # Latency period
 GM_TRecover = 10; # Time to recovery (no longer infectious)
 GM_IFR = 0.01; # Infected fatality rate
-GM_T50Testing = 70; # Time of 50% of final testing rate
-GM_TauTesting = 3;
+GM_T50Testing = 120; # Time of 50% of final testing rate
+GM_TauTesting = 21;
 GM_TTestingRate = 7; # 1/rate of testing
 GM_TContactsTestingRate = 2; # 1/rate of testing for contacts
-GM_FAsymp = 0.5; # Fraction asymptomatic
+GM_FAsymp = 0.295; # Fraction asymptomatic
 GM_TestingCoverage = 0.5; # Coverage of testing
 GM_TestSensitivity = 0.7; # True positive rate
 GM_ThetaMin = 0.44; # Minimum value for social distancing
-GM_TauTheta = 18; # Characteristic time for social distancing
-GM_PwrTheta = 4.4; # Power in Weibull model for social distancing
+GM_TauTheta = 21; # Characteristic time for social distancing
+GM_PwrTheta = 6; # Power in Weibull model for social distancing
 GM_HygienePwr = 0.25; # Relative impact of Hygiene vs. social distancing
-GM_FracTraced = 0.1; # Fraction traced
-GM_TPosTest = 3; # Delay time for positive tests (from I_U only)
-GM_TFatalDeath = 3; # Delay time for deaths
-GM_TauS = 33; # Days after TauTheta that Reopening starts
+GM_FracTraced = 0.25; # Fraction traced
+GM_TPosTest = 7; # Delay time for positive tests (from I_U only)
+GM_TFatalDeath = 7; # Delay time for deaths
+GM_TauS = 45; # Days after TauTheta that Reopening starts
 GM_rMax = 0.53; # Max reopen (1 = contacts/day back to baseline)
-GM_TauR = 44; # Duration of linear ramp-up of reopening
+GM_TauR = 45; # Duration of linear ramp-up of reopening
 
 SD_NInit; # Initial number of infected at Start Time
 SD_TIsolation; # Isolation time after contact tracing
