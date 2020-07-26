@@ -1,0 +1,496 @@
+---
+title: "Validation Figures"
+author: "Weihsueh Chiu"
+date: "`r format(Sys.time(), '%F')`"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(coda)
+library(bayesplot) 
+library(ggplot2)
+library(stringr)
+library(knitr)
+library(ggpubr)
+library(dplyr)
+library(metR)
+library(data.table)
+library(usmap)
+knitr::opts_chunk$set(echo = TRUE, dpi = 300, fig.height=6, fig.width=6,message = FALSE,warning=FALSE)
+functiondir <- "../functions"
+modeldir <- "../model"
+datezero <- "2019-12-31"
+source(file.path(functiondir,"get_reopendata_function.R"))
+```
+
+## Validation 
+
+Calibration using data until April 30. Validation with data through June 20.
+
+```{r load validation results, echo=FALSE, include=FALSE}
+
+# Separately source "run_plot_validation_scenario.R")
+
+folder <- "../SEIR.reopen.2020.04.30"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+allcalvaldat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  calvaldat <- read.csv(csvfile,as.is=TRUE)
+  calvaldat$state <- statenow
+  allcalvaldat <- rbind(allcalvaldat,calvaldat)
+}
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="N_pos"] <- "positiveIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_pos"] <- "deathIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="CumPos"] <- "positive"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_T"] <- "death"
+allcalvaldat$Date <- as.Date(allcalvaldat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+```
+
+Example states: one from each major region of the US: New York (Northeast), Ohio (Midwest), Texas (South), and Washington (West).
+
+```{r validation example states, echo=FALSE, fig.height=4.87,fig.width=8}
+egstates <- c("OH","NY","TX","WA")
+calvaldat.df <- subset(allcalvaldat,state %in% egstates)
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,state %in% egstates & (
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)) 
+
+## Calibration vs. validation
+datadatemax <- "2020-04-30"
+novalid <- FALSE
+validdate <- "2020-06-20"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+obsdat.df$Calibration <- factor(ifelse(obsdat.df$Calibration,
+                                       "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+calvaldat.df$Calibration <- factor(ifelse(calvaldat.df$Calibration,
+                                        "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+calvaldat.df$Prediction.2.5.[calvaldat.df$Prediction.2.5.<0.1]<-0.1
+calvaldat.df$Prediction.25.[calvaldat.df$Prediction.25.<0.1]<-0.1
+calvaldat.df$Prediction.50.[calvaldat.df$Prediction.50.<0.1]<-0.1
+calvaldat.df$Prediction.75.[calvaldat.df$Prediction.75.<0.1]<-0.1
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.<0.1]<-0.1
+
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+                                calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="deathIncrease"]<-1000
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>200 & 
+                                calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="deathIncrease"]<-200
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+                                calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="deathIncrease"]<-100
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+                                calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="deathIncrease"]<-100
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>12500 & 
+                                calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="positiveIncrease"]<-12500
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>2000 & 
+                                calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="positiveIncrease"]<-3000
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>5000 & 
+                                calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="positiveIncrease"]<-5000
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+                                calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="positiveIncrease"]<-1000
+p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  geom_col(aes(x=Date,y=Data,fill="",
+                             alpha=Calibration),data=obsdat.df)+
+  geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                  fill="CrI",alpha=Calibration))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                  fill="IQR",alpha=Calibration))+
+  geom_line(aes(x=Date,y=Prediction.50.,linetype="Median",
+                             alpha=Calibration))+
+  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
+  scale_x_date(date_minor_breaks = "1 day")+
+  facet_wrap(~Output_Var*state,ncol=4,
+                  labeller = labeller(Output_Var = obsnames),
+                scales="free_y")+
+     # facet_grid(state~Output_Var,
+     #              labeller = labeller(Output_Var = obsnames),
+     #            scales="free_y")+
+  theme_bw()+theme(legend.position = "bottom",
+                   legend.title = element_text(size = 8),
+                    legend.text = element_text(size = 8),
+                   strip.text = element_text(size=10,
+                                             margin = 
+                                               margin(.05, 0, .05, 0, "cm"))) + 
+        scale_alpha_discrete(range=rev(c(0.5,0.8)))+
+              geom_vline(xintercept=as.Date(datadatemax)+1,
+                         linetype="dotted",color="black") +
+  #scale_y_log10(breaks=10^(0:10))+
+        #annotation_logticks(sides="l")+
+        labs(fill="",linetype="Prediction",alpha="Dataset")+
+        guides(alpha = guide_legend(order = 1,nrow=1),
+         linetype = guide_legend(order = 2),
+         fill = guide_legend(order = 3,nrow=1))
+
+
+print(p)
+ggsave("Fig1B.pdf",plot=p,height=4.5,width=13,scale=0.8)
+# ggsave("Fig1B.png",plot=p,height=4.5,width=13,scale=1.1)
+# ggsave("Fig1B.jpeg",plot=p,height=4.5,width=13,scale=1.1)
+
+```
+
+
+
+Next are scatter plots showing overall calibration and validation of model.
+
+```{r validation scatter plot, echo=FALSE, fig.height=6, fig.width=8.5, fig.cap="Figure S-1. Validation runs: Comparison of data and predictions overall."}
+calvaldat.df <- allcalvaldat
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)
+
+## Calibration vs. validation
+datadatemax <- "2020-04-30"
+novalid <- FALSE
+validdate <- "2020-06-20"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+predobs.df <- merge(obsdat.df,calvaldat.df,all.x=TRUE)
+predobs.df$DataSet <- ifelse(predobs.df$Calibration,
+                             "Calibration","Validation")
+
+likeCIdeath <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="deathIncrease"
+                                              )$Data)),1000,3000,10000,20000))
+likeCIdeath$Prediction.50. <- likeCIdeath$Data
+likeCIdeath$Prediction.2.5. <- qnbinom(0.025,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Prediction.97.5. <- qnbinom(0.975,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Output_Var<-"deathIncrease"
+
+likeCIpositive <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="positiveIncrease"
+                                              )$Data)),20000))
+likeCIpositive$Prediction.50. <- likeCIpositive$Data
+likeCIpositive$Prediction.2.5. <- qnbinom(0.025,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Prediction.97.5. <- qnbinom(0.975,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Output_Var<-"positiveIncrease"
+likeCI<-rbind(likeCIpositive,likeCIdeath)
+likeCI$DataSet <- "Calibration"
+likeCI.tmp <- likeCI
+likeCI$DataSet <- "Validation"
+likeCI <- rbind(likeCI, likeCI.tmp)
+
+figS3<-ggplot(predobs.df)+
+  geom_pointrange(aes(x=Data,y=Prediction.50.,
+                      ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,
+                      color=state,group=state),
+                  position=position_jitter(width=0.1))+
+  geom_ribbon(data=likeCI,
+              aes(x=Data,ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,fill="CrI"),alpha=0.4)+
+  geom_abline(slope=1,intercept=0)+
+  scale_fill_viridis_d(option="magma",begin = 0.95,end=0.95)+
+  scale_color_viridis_d()+
+  coord_cartesian(xlim=c(0.1,20000),ylim=c(0.1,20000))+
+  scale_x_log10()+
+  scale_y_log10()+facet_grid(DataSet~Output_Var,labeller = labeller(Output_Var=obsnames))+
+  ylab("Prediction (95% CrI)")+guides(fill = "none")+
+  theme_bw()+
+  annotation_logticks()
+print(figS3)
+ggsave("FigS3.pdf",plot=figS3,height=6,width=8,scale=1.5)
+ggsave("FigS3.jpeg",plot=figS3,height=6,width=8,scale=1.5)
+```
+
+Each panel shows data versus predictions for daily deaths (left column) or cases (right column), with calibration results shown in the top panels (through April 1) and validation results in the bottom panels (through April 30).  Each point includes the 95% CrI for the prediction. The band centered on the y=x line shows the additional 95% CrI for the negative binomial likelihood, which is used to account for day-to-day variation in reporting.
+
+## Second Validation 
+
+Calibration using data until June 20. Validation with data through July 22.
+
+```{r load second validation results, echo=FALSE, include=FALSE}
+
+# Separately source "run_plot_validation.2_scenario.R")
+
+folder <- "../SEIR.reopen.state.2020.06.20"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+allcalvaldat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  calvaldat <- read.csv(csvfile,as.is=TRUE)
+  calvaldat$state <- statenow
+  allcalvaldat <- rbind(allcalvaldat,calvaldat)
+}
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="N_pos"] <- "positiveIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_pos"] <- "deathIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="CumPos"] <- "positive"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_T"] <- "death"
+allcalvaldat$Date <- as.Date(allcalvaldat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+```
+
+Example states: one from each major region of the US: New York (Northeast), Ohio (Midwest), Texas (South), and Washington (West).
+
+```{r second validation example states, echo=FALSE, fig.height=4.87,fig.width=8}
+egstates <- c("OH","NY","TX","WA")
+calvaldat.df <- subset(allcalvaldat,state %in% egstates)
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,state %in% egstates & (
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)) 
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- FALSE
+validdate <- "2020-07-22"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+obsdat.df$Calibration <- factor(ifelse(obsdat.df$Calibration,
+                                       "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+calvaldat.df$Calibration <- factor(ifelse(calvaldat.df$Calibration,
+                                        "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+calvaldat.df$Prediction.2.5.[calvaldat.df$Prediction.2.5.<0.1]<-0.1
+calvaldat.df$Prediction.25.[calvaldat.df$Prediction.25.<0.1]<-0.1
+calvaldat.df$Prediction.50.[calvaldat.df$Prediction.50.<0.1]<-0.1
+calvaldat.df$Prediction.75.[calvaldat.df$Prediction.75.<0.1]<-0.1
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.<0.1]<-0.1
+
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+#                                 calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="deathIncrease"]<-1000
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>200 & 
+#                                 calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="deathIncrease"]<-200
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+#                                 calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="deathIncrease"]<-100
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+#                                 calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="deathIncrease"]<-100
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>12500 & 
+#                                 calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="positiveIncrease"]<-12500
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>2000 & 
+#                                 calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="positiveIncrease"]<-3000
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>5000 & 
+#                                 calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="positiveIncrease"]<-5000
+# calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+#                                 calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="positiveIncrease"]<-1000
+p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  geom_col(aes(x=Date,y=Data,fill="",
+                             alpha=Calibration),data=obsdat.df)+
+  geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                  fill="CrI",alpha=Calibration))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                  fill="IQR",alpha=Calibration))+
+  geom_line(aes(x=Date,y=Prediction.50.,linetype="Median",
+                             alpha=Calibration))+
+  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
+  scale_x_date(date_minor_breaks = "1 day")+
+  facet_wrap(~Output_Var*state,ncol=4,
+                  labeller = labeller(Output_Var = obsnames),
+                scales="free_y")+
+     # facet_grid(state~Output_Var,
+     #              labeller = labeller(Output_Var = obsnames),
+     #            scales="free_y")+
+  theme_bw()+theme(legend.position = "bottom",
+                   legend.title = element_text(size = 8),
+                    legend.text = element_text(size = 8),
+                   strip.text = element_text(size=10,
+                                             margin = 
+                                               margin(.05, 0, .05, 0, "cm"))) + 
+        scale_alpha_discrete(range=rev(c(0.5,0.8)))+
+              geom_vline(xintercept=as.Date(datadatemax)+1,
+                         linetype="dotted",color="black") +
+  #scale_y_log10(breaks=10^(0:10))+
+        #annotation_logticks(sides="l")+
+        labs(fill="",linetype="Prediction",alpha="Dataset")+
+        guides(alpha = guide_legend(order = 1,nrow=1),
+         linetype = guide_legend(order = 2),
+         fill = guide_legend(order = 3,nrow=1))
+
+
+print(p)
+ggsave("Fig1B.2.pdf",plot=p,height=4.5,width=13,scale=0.8)
+# ggsave("Fig1B.2.png",plot=p,height=4.5,width=13,scale=1.1)
+# ggsave("Fig1B.2.jpeg",plot=p,height=4.5,width=13,scale=1.1)
+
+```
+
+
+
+Next are scatter plots showing overall calibration and validation of model.
+
+```{r second validation scatter plot, echo=FALSE, fig.height=6, fig.width=8.5}
+calvaldat.df <- allcalvaldat
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- FALSE
+validdate <- "2020-07-22"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+predobs.df <- merge(obsdat.df,calvaldat.df,all.x=TRUE)
+predobs.df$DataSet <- ifelse(predobs.df$Calibration,
+                             "Calibration","Validation")
+
+likeCIdeath <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="deathIncrease"
+                                              )$Data)),1000,3000,10000,20000))
+likeCIdeath$Prediction.50. <- likeCIdeath$Data
+likeCIdeath$Prediction.2.5. <- qnbinom(0.025,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Prediction.97.5. <- qnbinom(0.975,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Output_Var<-"deathIncrease"
+
+likeCIpositive <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="positiveIncrease"
+                                              )$Data)),20000))
+likeCIpositive$Prediction.50. <- likeCIpositive$Data
+likeCIpositive$Prediction.2.5. <- qnbinom(0.025,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Prediction.97.5. <- qnbinom(0.975,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Output_Var<-"positiveIncrease"
+likeCI<-rbind(likeCIpositive,likeCIdeath)
+likeCI$DataSet <- "Calibration"
+likeCI.tmp <- likeCI
+likeCI$DataSet <- "Validation"
+likeCI <- rbind(likeCI, likeCI.tmp)
+
+figS3<-ggplot(predobs.df)+
+  geom_pointrange(aes(x=Data,y=Prediction.50.,
+                      ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,
+                      color=state,group=state),
+                  position=position_jitter(width=0.1))+
+  geom_ribbon(data=likeCI,
+              aes(x=Data,ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,fill="CrI"),alpha=0.4)+
+  geom_abline(slope=1,intercept=0)+
+  scale_fill_viridis_d(option="magma",begin = 0.95,end=0.95)+
+  scale_color_viridis_d()+
+  coord_cartesian(xlim=c(0.1,20000),ylim=c(0.1,20000))+
+  scale_x_log10()+
+  scale_y_log10()+facet_grid(DataSet~Output_Var,labeller = labeller(Output_Var=obsnames))+
+  ylab("Prediction (95% CrI)")+guides(fill = "none")+
+  theme_bw()+
+  annotation_logticks()
+print(figS3)
+ggsave("FigS3.2.pdf",plot=figS3,height=6,width=8,scale=1.5)
+ggsave("FigS3.2.jpeg",plot=figS3,height=6,width=8,scale=1.5)
+```
+
+Each panel shows data versus predictions for daily deaths (left column) or cases (right column), with calibration results shown in the top panels (through June 20) and validation results in the bottom panels (through July 22).  Each point includes the 95% CrI for the prediction. The band centered on the y=x line shows the additional 95% CrI for the negative binomial likelihood, which is used to account for day-to-day variation in reporting.
+
+

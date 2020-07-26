@@ -1,0 +1,2163 @@
+---
+title: "Prediction Figures"
+author: "Weihsueh Chiu"
+date: "`r format(Sys.time(), '%F')`"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(coda)
+library(bayesplot) 
+library(ggplot2)
+library(stringr)
+library(knitr)
+library(ggpubr)
+library(dplyr)
+library(metR)
+library(data.table)
+library(usmap)
+knitr::opts_chunk$set(echo = TRUE, dpi = 300, fig.height=6, fig.width=6,message = FALSE,warning=FALSE)
+functiondir <- "../functions"
+modeldir <- "../model"
+datezero <- "2019-12-31"
+source(file.path(functiondir,"get_reopendata_function.R"))
+```
+
+## June Predictions
+
+```{r load full results, echo=FALSE, include=FALSE}
+folder <- "../SEIR.reopen.state.2020.06.20"
+
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+
+allpreddat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  preddat <- read.csv(csvfile,as.is=TRUE)
+  preddat$state <- statenow
+  allpreddat <- rbind(allpreddat,preddat)
+}
+allpreddat$Output_Var[allpreddat$Output_Var=="N_pos"] <- "positiveIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="D_pos"] <- "deathIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumPosTest"] <- "positive"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumDeath"] <- "death"
+allpreddat$Date <- as.Date(allpreddat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+# get reopening data
+reopen.df <- get_reopendata(datadir = "../data")
+minreopen<-aggregate(value~State.Abbr,data=reopen.df,min,na.rm=TRUE)
+rownames(minreopen)<-minreopen$State.Abbr
+```
+
+
+```{r Refft at minimum Rt, echo=FALSE,fig.height=3,fig.width=6}
+
+preddat.minRt.df<-subset(allpreddat,Output_Var=="Refft" & 
+                           Date <= as.Date("2020-06-20")) %>% 
+  group_by(state) %>% 
+  slice(which.min(Prediction.50.))
+preddat.minRt.df$Category <- "R[eff](t) ~ 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.minRt.df$Category<-factor(preddat.minRt.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.minRt.df)<- preddat.minRt.df$state
+pReffMin <- ggplot(preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Minimum value of ",R[eff](t),)))
+print(pReffMin)
+# ggsave("Refft.Min.pdf",plot=pReffMin,height=3,width=6,scale=1.75)
+# ggsave("Refft.Min.jpeg",plot=pReffMin,height=3,width=6,scale=1.75)
+```
+
+```{r Refft at 2020-06-20, echo=FALSE,fig.height=3,fig.width=6}
+preddat.df <- subset(allpreddat,Output_Var=="Refft")
+preddat.df <- preddat.df[preddat.df$Date==as.Date("2020-06-20"),]
+preddat.df$Category <- "R[eff](t) ~ 1"
+preddat.df$Category[preddat.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.df$Category[preddat.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.df$Category<-factor(preddat.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.df)<- preddat.df$state
+pReffnow <- ggplot(preddat.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," estimated 2020-06-20")))
+print(pReffnow)
+# ggsave("Refft.2020.06.20.pdf",plot=pReffnow,height=3,width=6,scale=1.75)
+# ggsave("Refft.2020.06.20.jpeg",plot=pReffnow,height=3,width=6,scale=1.75)
+
+fips_table$RtCategory <- preddat.df[fips_table$Alpha.code,"Category"]
+```
+
+```{r combined with min, echo=FALSE,fig.height=3,fig.width=6}
+pReffcombmin <- ggplot()+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),alpha=0.5,color="grey60",
+               stat="identity",data=preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity",data=preddat.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+    xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  geom_text(aes(x=state,y=0,label=Date,angle=90),
+            data=preddat.minRt.df,color="grey40",
+            hjust=0.25,size=2)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," at minimum and 2020-06-20")))
+print(pReffcombmin)
+# ggsave("Refft.comb.min.pdf",plot=pReffcombmin,height=3,width=6,scale=1.75)
+# ggsave("Refft.comb.min.jpeg",plot=pReffcombmin,height=3,width=6,scale=1.75)
+
+```
+
+
+```{r load parameters, echo=FALSE}
+## Load parameters
+folder <- "../SEIR.reopen.state.2020.06.20"
+numDate <- as.numeric(as.Date("2020-06-20"))-as.numeric(as.Date(datezero))
+t <- numDate
+allparms <- data.frame()
+allpriors <- data.frame()
+for (statenow in statesarr) { 
+  sampfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*samps.out",
+                         full.names=TRUE)
+  parms <- read.delim(sampfile,as.is=TRUE,sep=" ")
+  names(parms)<-gsub(".1.","",names(parms))
+  names(parms)<-gsub("GM_","",names(parms))
+  parms$state <- factor(statenow,levels=(sort(statesarr)))
+  parms$Log10NInit <- log10(parms$NInit)
+  parms$alpha <- 1/parms$TIsolation
+  parms$kappa <- 1/parms$TLatent
+  parms$rho <- 1/parms$TRecover
+  parms$lambda0 <- parms$TestingCoverage*parms$TestSensitivity/parms$TTestingRate;
+  parms$lambda0_C <- 1.0*parms$TestSensitivity/parms$TContactsTestingRate;
+  parms$rho0_C <- 1.0*(1.0 - parms$TestSensitivity)/parms$TContactsTestingRate;
+  parms$beta0 <- parms$R0 * parms$rho / parms$c0;
+  parms$HygieneMin <- parms$ThetaMin^parms$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  parms$ThetaFit <- (parms$ThetaMin - 
+                        (parms$ThetaMin - 1)*
+                        exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+  ## Reopening - increase contacts/day
+  parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+  parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+  parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+  parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+  ## Contacts/day
+  parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+  ## Hygiene - reduce infection probability/infected contact
+  parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+  parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+  parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+  ## Time dependence of testing/contact tracting
+  parms$TestingTimeDep <- (1-1/(1+exp((t-parms$T50Testing)/parms$TauTesting))); 
+  ## Contact tracing
+  parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+  ## Testing
+  parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+  parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+  parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+  parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+  ## Case fatality
+  parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+  parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+  parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+  allparms <- rbind(allparms,parms)
+  
+  
+  ## Load priors
+  priorfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*MTC.out",
+                         full.names=TRUE)
+  priors <- read.delim(priorfile,as.is=TRUE)
+  priors <- priors[,names(priors)!="NInit_1.1"]
+  names(priors)<-gsub("GM_","",names(priors))
+  priors$state <- factor(statenow,levels=(sort(statesarr)))
+  priors$Log10NInit <- log10(priors$NInit)
+  priors$alpha <- 1/priors$TIsolation
+  priors$kappa <- 1/priors$TLatent
+  priors$rho <- 1/priors$TRecover
+  priors$lambda0 <- priors$TestingCoverage*priors$TestSensitivity/priors$TTestingRate;
+  priors$lambda0_C <- 1.0*priors$TestSensitivity/priors$TContactsTestingRate;
+  priors$rho0_C <- 1.0*(1.0 - priors$TestSensitivity)/priors$TContactsTestingRate;
+  priors$beta0 <- priors$R0 * priors$rho / priors$c0;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+
+  priors$HygieneMin <- priors$ThetaMin^priors$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+  ## Reopening - increase contacts/day
+  priors$TimeReopen = 60+priors$TauTheta+priors$TauS;
+  priors$ReopenStart = (1 - 1/(1 + exp(4*(t - priors$TimeReopen))));
+  priors$ReopenStop =  (1 - 1/(1 + exp(4*(t - (priors$TimeReopen+priors$TauR)))));
+  priors$ReopenPct = ((t - priors$TimeReopen)*(priors$rMax/priors$TauR)*(priors$ReopenStart-priors$ReopenStop)+priors$rMax*priors$ReopenStop);
+  names(priors)[names(priors)=="Iter"]<-"iter"
+  allpriors <- rbind(allpriors,priors)
+  
+}
+allparms.med<-aggregate(.~state,data=allparms,median)
+allparms$Region <- fips_table[allparms$state,"Region"]
+allparms.med$Region <- fips_table[allparms.med$state,"Region"]
+allparms$Category <- fips_table[as.character(allparms$state),"RtCategory"]
+allparms.med$Category <- fips_table[as.character(allparms.med$state),"RtCategory"]
+
+
+
+```
+
+```{r transmission rebound at 2020-06-20, echo=FALSE,fig.height=6,fig.width=6}
+prebound <- ggplot(allparms)+
+  geom_col(aes(x=state,y=100*Delta,fill=Category),data=allparms.med)+
+  geom_boxplot(aes(x=state,y=100*Delta),alpha=0,outlier.shape = NA)+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+xlab("")+
+  ylim(0,100)+
+  ylab(bquote(Delta(t)))+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="bottom")+
+#  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Transmission Rebound ",Delta," estimated 2020-06-20")))
+print(prebound)
+# ggsave("Rebound.2020.06.20.pdf",plot=prebound,height=2,width=6,scale=1.75)
+# ggsave("Rebound.2020.06.20.jpeg",plot=prebound,height=2,width=6,scale=1.75)
+
+figReffRebound<-ggarrange(pReffcombmin,prebound,
+                  nrow=2,heights=c(2,1),labels = c("A", "B"))
+print(figReffRebound)
+ggsave("Fig2_ReffRebound.pdf",plot=figReffRebound,height=4,width=6,scale=1.75)
+ggsave("Fig2_ReffRebound.jpeg",plot=figReffRebound,height=4,width=6,scale=1.75)
+```
+
+```{r supplemental file with all priors and posteriors}
+parmstoplot<-c("Log10NInit",
+               "alpha",
+               "R0",
+               "c0",
+               "kappa",
+               "rho",
+               "IFR",
+               "TStartTesting",
+               "TauTesting",
+               "TTestingRate",
+               "TContactsTestingRate",
+               "TestingCoverage",
+               "TestSensitivity",
+               "ThetaMin",
+               "TauTheta",
+               "PwrTheta",
+               "HygienePwr",
+               "TauS",
+               "ReopenPct",
+               "TauR",
+               "FracTraced",
+               "TPosTest",
+               "TFatalDeath",
+               "alpha_Pos",
+               "alpha_Death")
+idvars<-c("iter","state","Region","Category")
+allparms.df <- allparms[,(names(allparms) %in% c(idvars,parmstoplot))]
+allparms.df <- melt(as.data.table(allparms.df),id.vars=idvars)
+allparms.df$variable<-factor(allparms.df$variable,
+                             levels=parmstoplot)
+allpriors.df <- allpriors[,(names(allpriors) %in% c(idvars,parmstoplot))]
+allpriors.df <- melt(as.data.table(allpriors.df),id.vars=c("iter","state"))
+pdf("FigS7_Priors_Posteriors_byState_06-20.pdf")
+for (statenow in statesarr) { 
+  p<-ggplot(subset(allparms.df,state==statenow),aes(x=value)) +
+      geom_histogram(aes(y=..density..,fill="Posterior")) +
+      geom_density(aes(fill="Prior"),alpha=0.6, 
+                   data=subset(allpriors.df,state==statenow)) + 
+    theme_bw()+theme(legend.position = "bottom")+
+    guides(fill = guide_legend(reverse = TRUE))+
+    labs(fill="")+ggtitle(statenow)+
+    scale_fill_viridis_d(begin=0,end=0.8,option="magma")+
+    facet_wrap(~variable,scales="free")
+  print(p)
+}
+dev.off()
+```
+
+
+```{r safe maps,echo=FALSE,fig.height=6,fig.width=6}
+folder <- "../SEIR.reopen.state.2020.06.20"
+numDate <- as.numeric(as.Date("2020-06-20"))-as.numeric(as.Date(datezero))
+t <- numDate
+if (file.exists("scenparms_OneTime-2020-06-20.RData")) load("scenparms_OneTime-2020-06-20.RData") else {
+  scenparms <- data.frame()
+  for (statenow in statesarr) { 
+    sampfile <- list.files(path=file.path(folder,statenow),
+                             pattern="*OneTime.out",
+                           full.names=TRUE)
+    parms <- read.delim(sampfile,as.is=TRUE,sep="\t")
+    names(parms)<-gsub("_1.1","",names(parms))
+    names(parms)<-gsub("GM_","",names(parms))
+    parms$state <- factor(statenow,levels=(sort(statesarr)))
+    
+    ## Time dependent parameters, evaluated at last day
+    parms$ThetaFit <- (parms$ThetaMin - 
+                          (parms$ThetaMin - 1)*
+                          exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+    ## Reopening - increase contacts/day
+    parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+    parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+    parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+    parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+    ## Contacts/day
+    parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+    ## Hygiene - reduce infection probability/infected contact
+    parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+    parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+    parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+    ## Time dependence of testing/contact tracting
+    parms$TestingTimeDep <- (1-1/(1+exp((t-parms$TStartTesting)/parms$TauTesting))); 
+    ## Contact tracing
+    parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+    ## Testing
+    parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+    parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+    parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+    parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+    ## Case fatality
+    parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+    parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+    parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+    scenparms <- rbind(scenparms,parms)
+  }
+  scenparms.med<-aggregate(.~state,data=scenparms,median)
+}
+
+ftraceloggrid<-10^seq(-2,0,0.01)
+lambdaloggrid<-10^seq(-2,-0.3,0.01)
+if (file.exists("f_lambda_safemap-2020-06-20.RData")) load("f_lambda_safemap-2020-06-20.RData") else {
+  gg.df <- data.frame()
+  for (statenow in statesarr) {
+    parms<-subset(scenparms,state==statenow)
+    gg <- expand.grid(FTraced=ftraceloggrid,lambda=lambdaloggrid)
+    gg$PrRle1<-0
+    for (j in 1:nrow(gg)){
+      fscale <- gg$FTraced[j]/median(parms$FTraced)
+      lscale <- gg$lambda[j]/median(parms$lambda)
+      Refft <- parms$R0*parms$S*parms$rho*(1-parms$FTraced*fscale)*
+        parms$HygieneFit*parms$c/parms$c0/(parms$rho+parms$lambda*lscale)
+      gg$PrRle1[j] <- ecdf(Refft)(1)
+    }
+    gg$state<-statenow
+    gg.df<-rbind(gg.df,gg)
+  }
+}
+
+pall<-ggplot(gg.df,aes(x=FTraced,y=lambda)) +
+  geom_tile(aes(fill=PrRle1))+
+  scale_fill_viridis_c("Probability R[eff](t)<1",begin = 0.4,option="magma")+
+  scale_x_log10(expand=c(0,0.02))+
+  scale_y_log10(expand=c(0,0.02))+
+  stat_contour(aes(z=PrRle1),
+               breaks=c(0.025,0.5,0.975))+
+  geom_label_contour(aes(z=PrRle1),label.padding=unit(0.05,"lines"),
+               breaks=c(0.025,0.5,0.975),size=3,alpha=0.5)+
+  geom_point(aes(x=FTraced,y=lambda,color=""),
+             fill="white",shape=21,data=scenparms.med,size=2)+
+  scale_color_viridis_d(begin=0,end=0)+
+  labs(fill=bquote(paste("Pr ",R[eff](t)<1)), color="Current Parameters")+
+  xlab(bquote(paste(f[C]," = Fraction of Contacts Traced")))+
+  ylab(bquote(lambda == Coverage %*% Sensitivity %*% TestingRate))+
+  annotation_logticks()+
+  facet_wrap(~state)+
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
+print(pall)
+
+ggsave("FigS9_fC_lambda_Contour.pdf",plot=pall,height=6,width=6,scale=1.5)
+ggsave("FigS9_fC_lambda_Contour.jpeg",plot=pall,height=6,width=6,scale=1.5)
+save(scenparms,scenparms.med,file="scenparms_OneTime-2020-06-20.RData")
+save(gg.df,file="f_lambda_safemap-2020-06-20.RData")
+```
+
+
+```{r Delta crit,echo=FALSE,fig.height=3,fig.width=6}
+if (file.exists("scenparms_OneTime-2020-06-20.RData")) load("scenparms_OneTime-2020-06-20.RData")
+scenparms<-scenparms[,!duplicated(names(scenparms))]
+  
+Deltacritfunc<-function(scenparms,fscale=1,lscale=1) {
+  ftracescaled<-scenparms$FTraced*fscale
+  ftracescaled[ftracescaled>0.99]<-0.99
+  Deltacrit<-((scenparms$rho+scenparms$lambda*lscale)/
+             (scenparms$S*scenparms$c0*scenparms$beta0*
+                (1-ftracescaled)) - 
+            scenparms$ThetaMin^(1+scenparms$HygienePwr))/
+    (1 - scenparms$ThetaMin^(1+scenparms$HygienePwr))
+  Deltacrit[Deltacrit>1]<-1
+  return(Deltacrit)
+}
+scenparms$Deltacrit.1.1 <- Deltacritfunc(scenparms,fscale=1,lscale=1)
+scenparms$Deltacrit.1.2 <- Deltacritfunc(scenparms,fscale=1,lscale=2)
+scenparms$Deltacrit.2.1 <- Deltacritfunc(scenparms,fscale=2,lscale=1)
+scenparms$Deltacrit.2.2 <- Deltacritfunc(scenparms,fscale=2,lscale=2)
+
+scenparms.med<-aggregate(.~state,data=scenparms,median)
+scenparms$Category <- fips_table[as.character(scenparms$state),"RtCategory"]
+scenparms.med$Category <- fips_table[as.character(scenparms.med$state),"RtCategory"]
+
+dftmp<-melt(as.data.table(scenparms),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp$variable[dftmp$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dftmp.med<-melt(as.data.table(scenparms.med),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dflabs<-c("Baseline","2X testing",
+                          "2X contact tracing","2X testing and contact tracing")
+names(dflabs)<-c("Delta[crit](1,1)","Delta[crit](1,2)","Delta[crit](2,1)","Delta[crit](2,2)")
+
+p<-ggplot(data=dftmp,
+       aes(x=state,
+           y=100*value,fill=Category
+           #,color=variable
+           )) + 
+  geom_boxplot(outlier.shape = NA,position="dodge")+
+  #geom_col(data=dftmp.med,position="dodge")+
+  #scale_color_viridis_d(begin=0.9,end=0.5,option="magma")+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #coord_cartesian(ylim=c(0,100))+
+  scale_y_continuous(breaks=seq(-25,100,25))+
+  ylab(bquote(Delta[crit]))+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom"
+        #            ,
+        #            axis.title.x=element_blank(),
+        # axis.text.x=element_blank(),
+        # axis.ticks.x=element_blank()
+        )+
+  geom_hline(yintercept=0)+
+  #ggtitle(bquote(paste(Delta[crit](mu[lambda],mu[C]),": Critical % reopening to keep ",R[eff](t)<1)))+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+p2<-p+geom_point(aes(x=state,y=100*Delta,shape="Delta(t)",fill=Category),
+                 data=dftmp.med)+
+  scale_shape_manual(values=21,
+                     labels=as.expression(bquote(Delta(t==2020-06-20))))
+print(p2)
+ggsave("Fig4_DeltacritDeltaCurrent.pdf",plot=p2,height=4,width=6,scale=1.75)
+ggsave("Fig4_DeltacritDeltaCurrent.jpeg",plot=p2,height=4,width=6,scale=1.75)
+```
+
+
+
+## Prediction
+
+Full calibration through June 20
+
+
+Again, time-courses for the four example states.
+
+```{r example states full pred, echo=FALSE}
+egstates <- c("OH","NY","TX","WA")
+preddat.df <- subset(allpreddat,state %in% egstates)
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,state %in% egstates & (
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)) 
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- TRUE
+validdate <- "2020-06-20"
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  preddat.df <- subset(preddat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  preddat.df <- subset(preddat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+p<-ggplot(subset(preddat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  geom_col(aes(x=Date,y=Data),data=obsdat.df)+
+        #geom_vline(aes(xintercept=as.Date(datadatemax)),color="grey",show.legend=FALSE)+
+        scale_alpha_discrete(range=c(0.4,1))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                  fill="CrI"))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                  fill="IQR"))+
+  geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
+  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+  scale_x_date(date_minor_breaks = "1 day")+
+  facet_wrap(~state*Output_Var,ncol=2,
+                  labeller = labeller(Output_Var = obsnames),
+                scales="free_y")+
+  theme_bw()+theme(legend.position = "bottom",
+                   strip.text = element_text(size=6,
+                                             margin = 
+                                               margin(.05, 0, .05, 0, "cm")))
+
+FigS5<-(p + 
+          #scale_y_log10(breaks=10^(0:10),limits=c(0.1,NA))+
+          #annotation_logticks(sides="l")+
+        guides(linetype = guide_legend(order = 1),fill = guide_legend(order = 2))+
+        labs(fill="",linetype="Prediction")+theme_bw()+theme(legend.position = "bottom"))
+        
+print(FigS5)
+ggsave("FigS5_06_20.pdf",plot=FigS5,height=4.87,width=4.4,scale=1.75)
+ggsave("FigS5_06_20.jpeg",plot=FigS5,height=4.87,width=4.4,scale=1.75)
+```
+
+Again, scatter plots showing overall calibration accuracy.
+
+```{r scatter plot full pred, echo=FALSE, fig.height=3.5}
+preddat.df <- allpreddat
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- TRUE
+validdate <- "2020-06-20"
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  preddat.df <- subset(preddat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  preddat.df <- subset(preddat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+predobs.df <- merge(obsdat.df,preddat.df,all.x=TRUE)
+
+likeCIdeath <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="deathIncrease"
+                                              )$Data)),1000,3000,10000,50000))
+likeCIdeath$Prediction.50. <- likeCIdeath$Data
+likeCIdeath$Prediction.2.5. <- qnbinom(0.025,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Prediction.97.5. <- qnbinom(0.975,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Output_Var<-"deathIncrease"
+
+likeCIpositive <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="positiveIncrease"
+                                              )$Data)),50000))
+likeCIpositive$Prediction.50. <- likeCIpositive$Data
+likeCIpositive$Prediction.2.5. <- qnbinom(0.025,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Prediction.97.5. <- qnbinom(0.975,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Output_Var<-"positiveIncrease"
+likeCI<-rbind(likeCIpositive,likeCIdeath)
+
+FigS6<-ggplot(predobs.df)+
+  geom_pointrange(aes(x=Data,y=Prediction.50.,
+                      ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,
+                      color=state,group=state),
+                  position=position_jitter(width=0.1))+
+  geom_ribbon(data=likeCI,
+              aes(x=Data,ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,fill="CrI"),alpha=0.4)+
+  geom_abline(slope=1,intercept=0)+
+  scale_fill_viridis_d(option="magma",begin = 0.95,end=0.95)+
+  scale_color_viridis_d()+
+  coord_cartesian(xlim=c(0.1,50000),ylim=c(0.1,50000))+
+  scale_x_log10()+
+  scale_y_log10()+facet_grid(~Output_Var,labeller = labeller(Output_Var=obsnames))+
+  ylab("Prediction (95% CrI)")+guides(fill = "none")+
+  theme_bw()+
+  annotation_logticks()
+print(FigS6)
+ggsave("FigS6_06_20.pdf",plot=FigS6,height=3.5,width=8,scale=1.5)
+ggsave("FigS6_06_20.jpeg",plot=FigS6,height=3.5,width=8,scale=1.5)
+```
+
+
+
+```{r contributions to Rt,echo=FALSE,fig.height=4,fig.width=8}
+
+res<-lm(Refft~.,data=scenparms[,c("R0","HygienePwr","ThetaMin",
+                                  "Delta","FracTraced","lambda","rho","Refft")])
+print(summary(res))
+print(anova(res))
+
+phyg<-ggplot(scenparms,aes(x=Refft,y=HygieneFit,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta^eta))+
+  theme(legend.position="none")
+
+phygpwr<-ggplot(scenparms,aes(x=Refft,y=HygienePwr,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(eta))+
+  theme(legend.position="none")
+
+ptheta<-ggplot(scenparms,aes(x=Refft,y=ThetaMin,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta[min]))+
+  theme(legend.position="none")
+
+pDelta<-ggplot(scenparms,aes(x=Refft,y=Delta,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(Delta))+
+  theme(legend.position="none")
+
+preopen<-ggplot(scenparms,aes(x=Refft,y=rMax,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(r[max]))+
+  theme(legend.position="none")
+
+pfc<-ggplot(scenparms,aes(x=Refft,y=FracTraced,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(f[C]))+
+  theme(legend.position="none")
+
+FigS8<-ggarrange(ptheta,phygpwr,
+                 pDelta,pfc,
+                 nrow=2,ncol=2,labels = c("A", "B","C","D"))
+print(FigS8)
+ 
+ggsave("FigS8_corr.pdf",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corr.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+```
+
+
+## Impact of different scenarios on daily cases and deaths
+
+
+```{r scenarioplots currentreopening, echo=FALSE,fig.height=4,fig.width=6}
+
+folder <- "../SEIR.reopen.state.2020.06.20"
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+datadatestart<-"2020-03-01"
+preddateend<-"2020-08-15"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+
+p0list <- list()
+# New facet label names 
+DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
+names(DeltaDelta.labs) <- c("0", "0.25")
+mu_Lambda.labs <- c("Testing Rate 1X", "Testing Rate 2X")
+names(mu_Lambda.labs) <- c("1", "2")
+mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
+names(mu_C.labs) <- c("1", "2")
+out.labs <- c("Daily reported cases","Daily confirmed deaths")
+names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+statesplot <- c("NY","OH","TX","WA")
+scen.df <- data.frame(state=sort(rep(statesplot,4)),
+                      mu_C = rep(rep(c(1,1,2,2),1),length(statesplot)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),1),length(statesplot)),
+                      DeltaDelta = rep(rep(0,4),length(statesplot)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta==0.25,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="N_pos"] <- "positiveIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_pos"] <- "deathIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_T"] <- "death"
+  scendat$Output_Var[scendat$Output_Var=="CumPos"] <- "positive"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date>=datadatestart)
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  allscendat<-rbind(allscendat,scendat)
+}
+
+for (statenow in statesplot) {
+  dat.df <- subset(alldat.df,state==statenow)
+  obsdat.df<-subset(dat.df,state==statenow & (
+    Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+  )) 
+  cumdat.df <- subset(allcumdat.df,state==statenow)
+  obsdat.df<-rbind(obsdat.df,
+                   subset(cumdat.df,state==statenow & (
+    Output_Var == "positive" | Output_Var == "death"
+  )))
+  ## DeltaDelta=0
+  tmpdat<-subset(allscendat,state == statenow & 
+                   (Output_Var=="positiveIncrease" | Output_Var=="deathIncrease") & 
+                   DeltaDelta==0 &
+                   Date >= datadatestart & 
+                   Date <= preddateend)
+  #ymax<-max(tmpdat$Prediction.97.5.,10)
+  rampup.df <- subset(tmpdat,Date==preddateend)
+  p0<-ggplot(tmpdat)+
+    geom_col(aes(x=Date,y=Data),data=subset(obsdat.df,Output_Var=="positiveIncrease"|
+                                              Output_Var=="deathIncrease"))+
+    geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                    fill="CrI"),alpha=0.8)+
+    geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                    fill="IQR"),alpha=0.8)+
+    geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
+    ylab("Daily reported cases or deaths")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+    scale_x_date(date_minor_breaks = "1 week",date_breaks = "month",date_labels = "%b")+
+    geom_rect(data=rampup.df,aes(xmin = as.Date("2020-07-01"), xmax = as.Date("2020-07-15"), 
+              ymin=0,ymax=Inf,alpha = "Ramp-up period"))+
+    scale_alpha_manual(values=0.2)+
+    #scale_y_log10(limits=c(1,NA))+
+    facet_grid(Output_Var~mu_C+mu_Lambda,scale="free_y",
+                  labeller = labeller(mu_C = mu_C.labs,
+                                      mu_Lambda = mu_Lambda.labs,
+                                      Output_Var = out.labs))+
+    guides(linetype = guide_legend(order = 1),fill = guide_legend(order = 2),alpha=guide_legend(order=3))+
+          labs(fill="",linetype="Prediction",alpha="")+theme_bw()+theme(legend.position = "bottom")
+  print(p0)
+  p0list[[statenow]]<-p0+ggtitle(statenow)
+}
+
+fig3current<-ggarrange(plotlist=p0list,
+                ncol=2,nrow=2,
+                common.legend = TRUE,
+                legend="bottom",
+                labels=c("A","B","C","D"))
+ggsave("Fig3ABCDcurrent_06_20-08-15.pdf",plot=fig3current,height=4,width=6,scale=2.5)
+ggsave("Fig3ABCDcurrent_06_20-08-15.jpeg",plot=fig3current,height=4,width=6,scale=2.5)
+```
+
+
+```{r scenario Refft, echo=FALSE,fig.height=4,fig.width=6}
+
+
+preddate<-c("2020-07-15")
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+
+# New facet label names 
+DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
+names(DeltaDelta.labs) <- c("0", "0.25")
+mu_Lambda.labs <- c("Testing Rate 1X", "Testing Rate 2X")
+names(mu_Lambda.labs) <- c("1", "2")
+mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
+names(mu_C.labs) <- c("1", "2")
+out.labs <- c("Daily reported cases","Daily confirmed deaths")
+names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+scen.df <- data.frame(state=sort(rep(statesarr,12)),
+                      mu_C = rep(rep(c(1,1,2,2),3),length(statesarr)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statesarr)),
+                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4)),length(statesarr)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta==0.25,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+scen.df$scenfactor <- factor(scen.df$scenariodesc,
+                             levels=rev(head(scen.df$scenariodesc,12)))
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="N_pos"] <- "positiveIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_pos"] <- "deathIncrease"
+  scendat$Output_Var[scendat$Output_Var=="CumDeath"] <- "death"
+  scendat$Output_Var[scendat$Output_Var=="CumPosTest"] <- "positive"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date==preddate)
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  scendat$scenariodesc <- scenrow$scenariodesc
+  scendat$scenfactor <- scenrow$scenfactor
+  allscendat<-rbind(allscendat,scendat)
+}
+
+Reffscendat <- subset(allscendat,Output_Var == "Refft" & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
+Reffscendat$R.le.1 <- as.numeric(Reffscendat$Prediction.75.<1)
+p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
+  theme(legend.position = "bottom")
+print(p)
+#ggsave("heatmap.pdf",p,height=5,width=15)
+Reffscendat.wide<-spread(Reffscendat[,c("state","scenfactor","R.le.1")],scenfactor,R.le.1)
+Grade.df <- data.frame(state=Reffscendat.wide$state)
+Grade.df$value<-"Very High"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
+                 (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+Grade.df$value <- factor(Grade.df$value,levels=
+                           c("None","Low","Moderate","High","Very High"))
+Reffscendat.mat<-as.matrix(Reffscendat.wide[,-1])
+rownames(Reffscendat.mat)<-Reffscendat.wide[,1]
+heatmap(t(Reffscendat.mat),cexRow = 0.5,cexCol = 0.5)
+Reffscendat$stateorder <- factor(Reffscendat$state,
+                                 levels=Grade.df$state[order(Grade.df$value)])
+porder<-ggplot(Reffscendat,aes(stateorder,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")
+#ggsave("heatmaporder.pdf",porder,height=5,width=15)
+
+
+
+
+pusa<-plot_usmap(data = Grade.df, values = "value") + 
+  scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
+  theme(legend.position = "right")
+print(pusa)
+ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
+ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
+
+write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
+```
+
+## July predictions
+
+```{r load full results, echo=FALSE, include=FALSE}
+folder <- "../SEIR.reopen.state.2020.07.22"
+
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+
+allpreddat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  preddat <- read.csv(csvfile,as.is=TRUE)
+  preddat$state <- statenow
+  allpreddat <- rbind(allpreddat,preddat)
+}
+allpreddat$Output_Var[allpreddat$Output_Var=="N_pos"] <- "positiveIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="D_pos"] <- "deathIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumPosTest"] <- "positive"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumDeath"] <- "death"
+allpreddat$Date <- as.Date(allpreddat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+# get reopening data
+reopen.df <- get_reopendata(datadir = "../data")
+minreopen<-aggregate(value~State.Abbr,data=reopen.df,min,na.rm=TRUE)
+rownames(minreopen)<-minreopen$State.Abbr
+```
+
+
+```{r Refft at minimum Rt, echo=FALSE,fig.height=3,fig.width=6}
+
+preddat.minRt.df<-subset(allpreddat,Output_Var=="Refft" & 
+                           Date <= as.Date("2020-07-22")) %>% 
+  group_by(state) %>% 
+  slice(which.min(Prediction.50.))
+preddat.minRt.df$Category <- "R[eff](t) ~ 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.minRt.df$Category<-factor(preddat.minRt.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.minRt.df)<- preddat.minRt.df$state
+pReffMin <- ggplot(preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Minimum value of ",R[eff](t),)))
+print(pReffMin)
+# ggsave("Refft.Min.pdf",plot=pReffMin,height=3,width=6,scale=1.75)
+# ggsave("Refft.Min.jpeg",plot=pReffMin,height=3,width=6,scale=1.75)
+```
+
+```{r Refft at 2020-07-22, echo=FALSE,fig.height=3,fig.width=6}
+preddat.df <- subset(allpreddat,Output_Var=="Refft")
+preddat.df <- preddat.df[preddat.df$Date==as.Date("2020-07-22"),]
+preddat.df$Category <- "R[eff](t) ~ 1"
+preddat.df$Category[preddat.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.df$Category[preddat.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.df$Category<-factor(preddat.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.df)<- preddat.df$state
+pReffnow <- ggplot(preddat.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," estimated 2020-07-22")))
+print(pReffnow)
+# ggsave("Refft.2020.07.22.pdf",plot=pReffnow,height=3,width=6,scale=1.75)
+# ggsave("Refft.2020.07.22.jpeg",plot=pReffnow,height=3,width=6,scale=1.75)
+
+fips_table$RtCategory <- preddat.df[fips_table$Alpha.code,"Category"]
+```
+
+```{r combined with min, echo=FALSE,fig.height=3,fig.width=6}
+pReffcombmin <- ggplot()+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),alpha=0.5,color="grey60",
+               stat="identity",data=preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity",data=preddat.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+    xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  geom_text(aes(x=state,y=0,label=Date,angle=90),
+            data=preddat.minRt.df,color="grey40",
+            hjust=0.25,size=2)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," at minimum and 2020-07-22")))
+print(pReffcombmin)
+# ggsave("Refft.comb.min.pdf",plot=pReffcombmin,height=3,width=6,scale=1.75)
+# ggsave("Refft.comb.min.jpeg",plot=pReffcombmin,height=3,width=6,scale=1.75)
+
+```
+
+
+```{r load parameters, echo=FALSE}
+## Load parameters
+folder <- "../SEIR.reopen.state.2020.07.22"
+numDate <- as.numeric(as.Date("2020-07-22"))-as.numeric(as.Date(datezero))
+t <- numDate
+allparms <- data.frame()
+allpriors <- data.frame()
+for (statenow in statesarr) { 
+  sampfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*samps.out",
+                         full.names=TRUE)
+  parms <- read.delim(sampfile,as.is=TRUE,sep=" ")
+  names(parms)<-gsub(".1.","",names(parms))
+  names(parms)<-gsub("GM_","",names(parms))
+  parms$state <- factor(statenow,levels=(sort(statesarr)))
+  parms$Log10NInit <- log10(parms$NInit)
+  parms$alpha <- 1/parms$TIsolation
+  parms$kappa <- 1/parms$TLatent
+  parms$rho <- 1/parms$TRecover
+  parms$lambda0 <- parms$TestingCoverage*parms$TestSensitivity/parms$TTestingRate;
+  parms$lambda0_C <- 1.0*parms$TestSensitivity/parms$TContactsTestingRate;
+  parms$rho0_C <- 1.0*(1.0 - parms$TestSensitivity)/parms$TContactsTestingRate;
+  parms$beta0 <- parms$R0 * parms$rho / parms$c0;
+  parms$HygieneMin <- parms$ThetaMin^parms$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  parms$ThetaFit <- (parms$ThetaMin - 
+                        (parms$ThetaMin - 1)*
+                        exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+  ## Reopening - increase contacts/day
+  parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+  parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+  parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+  parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+  ## Contacts/day
+  parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+  ## Hygiene - reduce infection probability/infected contact
+  parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+  parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+  parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+  ## Time dependence of testing/contact tracting
+  parms$TestingTimeDep <- (1-1/(1+exp((t-parms$TStartTesting)/parms$TauTesting))); 
+  ## Contact tracing
+  parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+  ## Testing
+  parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+  parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+  parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+  parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+  ## Case fatality
+  parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+  parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+  parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+  allparms <- rbind(allparms,parms)
+  
+  
+  ## Load priors
+  priorfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*MTC.out",
+                         full.names=TRUE)
+  priors <- read.delim(priorfile,as.is=TRUE)
+  priors <- priors[,names(priors)!="NInit_1.1"]
+  names(priors)<-gsub("GM_","",names(priors))
+  priors$state <- factor(statenow,levels=(sort(statesarr)))
+  priors$Log10NInit <- log10(priors$NInit)
+  priors$alpha <- 1/priors$TIsolation
+  priors$kappa <- 1/priors$TLatent
+  priors$rho <- 1/priors$TRecover
+  priors$lambda0 <- priors$TestingCoverage*priors$TestSensitivity/priors$TTestingRate;
+  priors$lambda0_C <- 1.0*priors$TestSensitivity/priors$TContactsTestingRate;
+  priors$rho0_C <- 1.0*(1.0 - priors$TestSensitivity)/priors$TContactsTestingRate;
+  priors$beta0 <- priors$R0 * priors$rho / priors$c0;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+
+  priors$HygieneMin <- priors$ThetaMin^priors$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+  ## Reopening - increase contacts/day
+  priors$TimeReopen = 60+priors$TauTheta+priors$TauS;
+  priors$ReopenStart = (1 - 1/(1 + exp(4*(t - priors$TimeReopen))));
+  priors$ReopenStop =  (1 - 1/(1 + exp(4*(t - (priors$TimeReopen+priors$TauR)))));
+  priors$ReopenPct = ((t - priors$TimeReopen)*(priors$rMax/priors$TauR)*(priors$ReopenStart-priors$ReopenStop)+priors$rMax*priors$ReopenStop);
+  names(priors)[names(priors)=="Iter"]<-"iter"
+  allpriors <- rbind(allpriors,priors)
+  
+}
+allparms.med<-aggregate(.~state,data=allparms,median)
+allparms$Region <- fips_table[allparms$state,"Region"]
+allparms.med$Region <- fips_table[allparms.med$state,"Region"]
+allparms$Category <- fips_table[as.character(allparms$state),"RtCategory"]
+allparms.med$Category <- fips_table[as.character(allparms.med$state),"RtCategory"]
+
+
+
+```
+
+```{r transmission rebound at 2020-07-22, echo=FALSE,fig.height=6,fig.width=6}
+prebound <- ggplot(allparms)+
+  geom_col(aes(x=state,y=100*Delta,fill=Category),data=allparms.med)+
+  geom_boxplot(aes(x=state,y=100*Delta),alpha=0,outlier.shape = NA)+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+xlab("")+
+  ylim(0,100)+
+  ylab(bquote(Delta(t)))+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="bottom")+
+#  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Transmission Rebound ",Delta," estimated 2020-07-22")))
+print(prebound)
+# ggsave("Rebound.2020.07.22.pdf",plot=prebound,height=2,width=6,scale=1.75)
+# ggsave("Rebound.2020.07.22.jpeg",plot=prebound,height=2,width=6,scale=1.75)
+
+figReffRebound<-ggarrange(pReffcombmin,prebound,
+                  nrow=2,heights=c(2,1),labels = c("A", "B"))
+print(figReffRebound)
+ggsave("Fig2_ReffRebound.2020.07.22.pdf",plot=figReffRebound,height=4,width=6,scale=1.75)
+ggsave("Fig2_ReffRebound.2020.07.22.jpeg",plot=figReffRebound,height=4,width=6,scale=1.75)
+```
+
+```{r supplemental file with all priors and posteriors}
+parmstoplot<-c("Log10NInit",
+               "alpha",
+               "R0",
+               "c0",
+               "kappa",
+               "rho",
+               "IFR",
+               "TStartTesting",
+               "TauTesting",
+               "TTestingRate",
+               "TContactsTestingRate",
+               "TestingCoverage",
+               "TestSensitivity",
+               "ThetaMin",
+               "TauTheta",
+               "PwrTheta",
+               "HygienePwr",
+               "TauS",
+               "ReopenPct",
+               "TauR",
+               "FracTraced",
+               "TPosTest",
+               "TFatalDeath",
+               "alpha_Pos",
+               "alpha_Death")
+idvars<-c("iter","state","Region","Category")
+allparms.df <- allparms[,(names(allparms) %in% c(idvars,parmstoplot))]
+allparms.df <- melt(as.data.table(allparms.df),id.vars=idvars)
+allparms.df$variable<-factor(allparms.df$variable,
+                             levels=parmstoplot)
+allpriors.df <- allpriors[,(names(allpriors) %in% c(idvars,parmstoplot))]
+allpriors.df <- melt(as.data.table(allpriors.df),id.vars=c("iter","state"))
+pdf("FigS7_Priors_Posteriors_byState_07-22.pdf")
+for (statenow in statesarr) { 
+  p<-ggplot(subset(allparms.df,state==statenow),aes(x=value)) +
+      geom_histogram(aes(y=..density..,fill="Posterior")) +
+      geom_density(aes(fill="Prior"),alpha=0.6, 
+                   data=subset(allpriors.df,state==statenow)) + 
+    theme_bw()+theme(legend.position = "bottom")+
+    guides(fill = guide_legend(reverse = TRUE))+
+    labs(fill="")+ggtitle(statenow)+
+    scale_fill_viridis_d(begin=0,end=0.8,option="magma")+
+    facet_wrap(~variable,scales="free")
+  print(p)
+}
+dev.off()
+```
+
+
+```{r safe maps,echo=FALSE,fig.height=6,fig.width=6}
+folder <- "../SEIR.reopen.state.2020.07.22"
+numDate <- as.numeric(as.Date("2020-07-22"))-as.numeric(as.Date(datezero))
+t <- numDate
+if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData") else {
+  scenparms <- data.frame()
+  for (statenow in statesarr) { 
+    sampfile <- list.files(path=file.path(folder,statenow),
+                             pattern="*OneTime.out",
+                           full.names=TRUE)
+    parms <- read.delim(sampfile,as.is=TRUE,sep="\t")
+    names(parms)<-gsub("_1.1","",names(parms))
+    names(parms)<-gsub("GM_","",names(parms))
+    parms$state <- factor(statenow,levels=(sort(statesarr)))
+    
+    ## Time dependent parameters, evaluated at last day
+    parms$ThetaFit <- (parms$ThetaMin - 
+                          (parms$ThetaMin - 1)*
+                          exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+    ## Reopening - increase contacts/day
+    parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+    parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+    parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+    parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+    ## Contacts/day
+    parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+    ## Hygiene - reduce infection probability/infected contact
+    parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+    parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+    parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+    ## Time dependence of testing/contact tracting
+    parms$TestingTimeDep <- (1-1/(1+exp((t-parms$TStartTesting)/parms$TauTesting))); 
+    ## Contact tracing
+    parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+    ## Testing
+    parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+    parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+    parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+    parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+    ## Case fatality
+    parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+    parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+    parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+    scenparms <- rbind(scenparms,parms)
+  }
+  scenparms.med<-aggregate(.~state,data=scenparms,median)
+}
+
+ftraceloggrid<-10^seq(-2,0,0.01)
+lambdaloggrid<-10^seq(-2,-0.3,0.01)
+if (file.exists("f_lambda_safemap-2020-07-22.RData")) load("f_lambda_safemap-2020-07-22.RData") else {
+  gg.df <- data.frame()
+  for (statenow in statesarr) {
+    parms<-subset(scenparms,state==statenow)
+    gg <- expand.grid(FTraced=ftraceloggrid,lambda=lambdaloggrid)
+    gg$PrRle1<-0
+    for (j in 1:nrow(gg)){
+      fscale <- gg$FTraced[j]/median(parms$FTraced)
+      lscale <- gg$lambda[j]/median(parms$lambda)
+      Refft <- parms$R0*parms$S*parms$rho*(1-parms$FTraced*fscale)*
+        parms$HygieneFit*parms$c/parms$c0*(
+          (1 - parms$FAsymp)/(parms$rho+parms$lambda*lscale)+
+            parms$FAsymp/parms$rho)
+      gg$PrRle1[j] <- ecdf(Refft)(1)
+    }
+    gg$state<-statenow
+    gg.df<-rbind(gg.df,gg)
+  }
+}
+
+pall<-ggplot(gg.df,aes(x=FTraced,y=lambda)) +
+  geom_tile(aes(fill=PrRle1))+
+  scale_fill_viridis_c("Probability R[eff](t)<1",begin = 0.4,option="magma")+
+  scale_x_log10(expand=c(0,0.02))+
+  scale_y_log10(expand=c(0,0.02))+
+  stat_contour(aes(z=PrRle1),
+               breaks=c(0.025,0.5,0.975))+
+  geom_label_contour(aes(z=PrRle1),label.padding=unit(0.05,"lines"),
+               breaks=c(0.025,0.5,0.975),size=3,alpha=0.5)+
+  geom_point(aes(x=FTraced,y=lambda,color=""),
+             fill="white",shape=21,data=scenparms.med,size=2)+
+  scale_color_viridis_d(begin=0,end=0)+
+  labs(fill=bquote(paste("Pr ",R[eff](t)<1)), color="Current Parameters")+
+  xlab(bquote(paste(f[C]," = Fraction of Contacts Traced")))+
+  ylab(bquote(lambda == Coverage %*% Sensitivity %*% TestingRate))+
+  annotation_logticks()+
+  facet_wrap(~state)+
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
+print(pall)
+
+ggsave("FigS9_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
+ggsave("FigS9_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
+save(scenparms,scenparms.med,file="scenparms_OneTime-2020-07-22.RData")
+save(gg.df,file="f_lambda_safemap-2020-07-22.RData")
+```
+
+
+```{r Delta crit,echo=FALSE,fig.height=3,fig.width=6}
+if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData")
+scenparms<-scenparms[,!duplicated(names(scenparms))]
+  
+Deltacritfunc<-function(scenparms,fscale=1,lscale=1) {
+  ftracescaled<-scenparms$FTraced*fscale
+  ftracescaled[ftracescaled>0.99]<-0.99
+  Deltacrit<-((scenparms$rho+scenparms$lambda*lscale)/
+             (scenparms$S*scenparms$c0*scenparms$beta0*
+                (1-ftracescaled)) - 
+            scenparms$ThetaMin^(1+scenparms$HygienePwr))/
+    (1 - scenparms$ThetaMin^(1+scenparms$HygienePwr))
+  Deltacrit[Deltacrit>1]<-1
+  return(Deltacrit)
+}
+scenparms$Deltacrit.1.1 <- Deltacritfunc(scenparms,fscale=1,lscale=1)
+scenparms$Deltacrit.1.2 <- Deltacritfunc(scenparms,fscale=1,lscale=2)
+scenparms$Deltacrit.2.1 <- Deltacritfunc(scenparms,fscale=2,lscale=1)
+scenparms$Deltacrit.2.2 <- Deltacritfunc(scenparms,fscale=2,lscale=2)
+
+scenparms.med<-aggregate(.~state,data=scenparms,median)
+scenparms$Category <- fips_table[as.character(scenparms$state),"RtCategory"]
+scenparms.med$Category <- fips_table[as.character(scenparms.med$state),"RtCategory"]
+
+dftmp<-melt(as.data.table(scenparms),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp$variable[dftmp$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dftmp.med<-melt(as.data.table(scenparms.med),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dflabs<-c("Baseline","2X testing",
+                          "2X contact tracing","2X testing and contact tracing")
+names(dflabs)<-c("Delta[crit](1,1)","Delta[crit](1,2)","Delta[crit](2,1)","Delta[crit](2,2)")
+
+p<-ggplot(data=dftmp,
+       aes(x=state,
+           y=100*value,fill=Category
+           #,color=variable
+           )) + 
+  geom_boxplot(outlier.shape = NA,position="dodge")+
+  #geom_col(data=dftmp.med,position="dodge")+
+  #scale_color_viridis_d(begin=0.9,end=0.5,option="magma")+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #coord_cartesian(ylim=c(0,100))+
+  scale_y_continuous(breaks=seq(-25,100,25))+
+  ylab(bquote(Delta[crit]))+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom"
+        #            ,
+        #            axis.title.x=element_blank(),
+        # axis.text.x=element_blank(),
+        # axis.ticks.x=element_blank()
+        )+
+  geom_hline(yintercept=0)+
+  #ggtitle(bquote(paste(Delta[crit](mu[lambda],mu[C]),": Critical % reopening to keep ",R[eff](t)<1)))+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+p2<-p+geom_point(aes(x=state,y=100*Delta,shape="Delta(t)",fill=Category),
+                 data=dftmp.med)+
+  scale_shape_manual(values=21,
+                     labels=as.expression(bquote(Delta(t==2020-07-22))))
+print(p2)
+ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.pdf",plot=p2,height=4,width=6,scale=1.75)
+ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.jpeg",plot=p2,height=4,width=6,scale=1.75)
+```
+
+
+## Validation 
+
+Calibration using data until April 30. Validation with data through June 20.
+
+```{r load results, echo=FALSE, include=FALSE}
+folder <- "../SEIR.reopen.2020.04.30"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+allcalvaldat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  calvaldat <- read.csv(csvfile,as.is=TRUE)
+  calvaldat$state <- statenow
+  allcalvaldat <- rbind(allcalvaldat,calvaldat)
+}
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="N_pos"] <- "positiveIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_pos"] <- "deathIncrease"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="CumPos"] <- "positive"
+allcalvaldat$Output_Var[allcalvaldat$Output_Var=="D_T"] <- "death"
+allcalvaldat$Date <- as.Date(allcalvaldat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+```
+
+Example states: one from each major region of the US: New York (Northeast), Ohio (Midwest), Texas (South), and Washington (West).
+
+```{r example states, echo=FALSE, fig.height=4.87,fig.width=4.4, fig.cap="Figure 1B (embedded as part of Figure 1). Validation runs: Model calibration (through April 30, 2020) and validation (through June 20, 2020) time-courses for selected States."}
+egstates <- c("OH","NY","TX","WA")
+calvaldat.df <- subset(allcalvaldat,state %in% egstates)
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,state %in% egstates & (
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)) 
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- FALSE
+validdate <- "2020-07-22"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+obsdat.df$Calibration <- factor(ifelse(obsdat.df$Calibration,
+                                       "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+calvaldat.df$Calibration <- factor(ifelse(calvaldat.df$Calibration,
+                                        "Train","Validate"),
+                                levels=c("Train","Validate"))
+
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+calvaldat.df$Prediction.2.5.[calvaldat.df$Prediction.2.5.<0.1]<-0.1
+calvaldat.df$Prediction.25.[calvaldat.df$Prediction.25.<0.1]<-0.1
+calvaldat.df$Prediction.50.[calvaldat.df$Prediction.50.<0.1]<-0.1
+calvaldat.df$Prediction.75.[calvaldat.df$Prediction.75.<0.1]<-0.1
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.<0.1]<-0.1
+
+p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  geom_col(aes(x=Date,y=Data,
+                             alpha=Calibration),data=obsdat.df)+
+  geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                  fill="CrI",alpha=Calibration))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                  fill="IQR",alpha=Calibration))+
+  geom_line(aes(x=Date,y=Prediction.50.,linetype="Median",
+                             alpha=Calibration))+
+  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+  scale_x_date(date_minor_breaks = "1 day")+
+  facet_wrap(~state*Output_Var,ncol=2,
+                  labeller = labeller(Output_Var = obsnames),
+                scales="free_y")+
+     # facet_grid(state~Output_Var,
+     #              labeller = labeller(Output_Var = obsnames),
+     #            scales="free_y")+
+  theme_bw()+theme(legend.position = "bottom",
+                   strip.text = element_text(size=6,
+                                             margin = 
+                                               margin(.05, 0, .05, 0, "cm"))) + 
+        scale_alpha_discrete(range=rev(c(0.4,0.8)))+
+              geom_vline(xintercept=as.Date(datadatemax)+1,
+                         linetype="dotted",color="black") +
+  #scale_y_log10(breaks=10^(0:10))+
+        #annotation_logticks(sides="l")+
+        labs(fill="",linetype="Prediction",alpha="Dataset")+
+        guides(alpha = guide_legend(order = 1,nrow=2),
+         linetype = guide_legend(order = 2),
+         fill = guide_legend(order = 3,nrow=2))
+
+
+print(p)
+ggsave("Fig1B.2020.07.22.pdf",plot=p,height=4.87,width=4.4,scale=1.1)
+ggsave("Fig1B.2020.07.22.png",plot=p,height=4.87,width=4.4,scale=1.1)
+ggsave("Fig1B.2020.07.22.jpeg",plot=p,height=4.87,width=4.4,scale=1.1)
+
+```
+
+
+
+Next are scatter plots showing overall calibration and validation of model.
+
+```{r scatter plot, echo=FALSE, fig.height=6, fig.width=8.5, fig.cap="Figure S-1. Validation runs: Comparison of data and predictions overall."}
+calvaldat.df <- allcalvaldat
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)
+
+## Calibration vs. validation
+datadatemax <- "2020-06-20"
+novalid <- FALSE
+validdate <- "2020-07-22"
+obsdat.df$Calibration <- obsdat.df$Date <= datadatemax
+calvaldat.df$Calibration <- calvaldat.df$Date <= datadatemax
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  calvaldat.df <- subset(calvaldat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+predobs.df <- merge(obsdat.df,calvaldat.df,all.x=TRUE)
+predobs.df$DataSet <- ifelse(predobs.df$Calibration,
+                             "Calibration","Validation")
+
+likeCIdeath <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="deathIncrease"
+                                              )$Data)),1000,3000,10000,20000))
+likeCIdeath$Prediction.50. <- likeCIdeath$Data
+likeCIdeath$Prediction.2.5. <- qnbinom(0.025,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Prediction.97.5. <- qnbinom(0.975,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Output_Var<-"deathIncrease"
+
+likeCIpositive <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="positiveIncrease"
+                                              )$Data)),20000))
+likeCIpositive$Prediction.50. <- likeCIpositive$Data
+likeCIpositive$Prediction.2.5. <- qnbinom(0.025,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Prediction.97.5. <- qnbinom(0.975,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Output_Var<-"positiveIncrease"
+likeCI<-rbind(likeCIpositive,likeCIdeath)
+likeCI$DataSet <- "Calibration"
+likeCI.tmp <- likeCI
+likeCI$DataSet <- "Validation"
+likeCI <- rbind(likeCI, likeCI.tmp)
+
+figS3<-ggplot(predobs.df)+
+  geom_pointrange(aes(x=Data,y=Prediction.50.,
+                      ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,
+                      color=state,group=state),
+                  position=position_jitter(width=0.1))+
+  geom_ribbon(data=likeCI,
+              aes(x=Data,ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,fill="CrI"),alpha=0.4)+
+  geom_abline(slope=1,intercept=0)+
+  scale_fill_viridis_d(option="magma",begin = 0.95,end=0.95)+
+  scale_color_viridis_d()+
+  coord_cartesian(xlim=c(0.1,20000),ylim=c(0.1,20000))+
+  scale_x_log10()+
+  scale_y_log10()+facet_grid(DataSet~Output_Var,labeller = labeller(Output_Var=obsnames))+
+  ylab("Prediction (95% CrI)")+guides(fill = "none")+
+  theme_bw()+
+  annotation_logticks()
+print(figS3)
+ggsave("FigS3.2020.07.22.pdf",plot=figS3,height=6,width=8,scale=1.5)
+ggsave("FigS3.2020.07.22.jpeg",plot=figS3,height=6,width=8,scale=1.5)
+```
+
+Each panel shows data versus predictions for daily deaths (left column) or cases (right column), with calibration results shown in the top panels (through April 1) and validation results in the bottom panels (through April 30).  Each point includes the 95% CrI for the prediction. The band centered on the y=x line shows the additional 95% CrI for the negative binomial likelihood, which is used to account for day-to-day variation in reporting.
+
+## Prediction
+
+Full calibration through June 20
+
+
+Again, time-courses for the four example states.
+
+```{r example states full pred, echo=FALSE}
+egstates <- c("OH","NY","TX","WA")
+preddat.df <- subset(allpreddat,state %in% egstates)
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,state %in% egstates & (
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)) 
+
+## Calibration vs. validation
+datadatemax <- "2020-07-22"
+novalid <- TRUE
+validdate <- "2020-07-22"
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  preddat.df <- subset(preddat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  preddat.df <- subset(preddat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+p<-ggplot(subset(preddat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  geom_col(aes(x=Date,y=Data),data=obsdat.df)+
+        #geom_vline(aes(xintercept=as.Date(datadatemax)),color="grey",show.legend=FALSE)+
+        scale_alpha_discrete(range=c(0.4,1))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                  fill="CrI"))+
+  geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                  fill="IQR"))+
+  geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
+  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+  scale_x_date(date_minor_breaks = "1 day")+
+  facet_wrap(~state*Output_Var,ncol=2,
+                  labeller = labeller(Output_Var = obsnames),
+                scales="free_y")+
+  theme_bw()+theme(legend.position = "bottom",
+                   strip.text = element_text(size=6,
+                                             margin = 
+                                               margin(.05, 0, .05, 0, "cm")))
+
+FigS5<-(p + 
+          #scale_y_log10(breaks=10^(0:10),limits=c(0.1,NA))+
+          #annotation_logticks(sides="l")+
+        guides(linetype = guide_legend(order = 1),fill = guide_legend(order = 2))+
+        labs(fill="",linetype="Prediction")+theme_bw()+theme(legend.position = "bottom"))
+        
+print(FigS5)
+ggsave("FigS5_06_20.pdf",plot=FigS5,height=4.87,width=4.4,scale=1.75)
+ggsave("FigS5_06_20.jpeg",plot=FigS5,height=4.87,width=4.4,scale=1.75)
+```
+
+Again, scatter plots showing overall calibration accuracy.
+
+```{r scatter plot full pred, echo=FALSE, fig.height=3.5}
+preddat.df <- allpreddat
+
+## Observed/predicted daily
+obsdat.df<-subset(alldat.df,
+  Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+)
+
+## Calibration vs. validation
+datadatemax <- "2020-07-22"
+novalid <- TRUE
+validdate <- "2020-07-22"
+if (novalid) {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(datadatemax))
+  preddat.df <- subset(preddat.df,Date <= as.Date(datadatemax))
+} else {
+  obsdat.df <- subset(obsdat.df,Date <= as.Date(validdate))
+  preddat.df <- subset(preddat.df,Date <= as.Date(validdate))
+}
+obsnames <- c("Daily reported cases","Daily confirmed deaths")
+names(obsnames) <- c("positiveIncrease","deathIncrease")
+
+predobs.df <- merge(obsdat.df,preddat.df,all.x=TRUE)
+
+likeCIdeath <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="deathIncrease"
+                                              )$Data)),1000,3000,10000,50000))
+likeCIdeath$Prediction.50. <- likeCIdeath$Data
+likeCIdeath$Prediction.2.5. <- qnbinom(0.025,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Prediction.97.5. <- qnbinom(0.975,size=8,
+                                       prob=8/(8+likeCIdeath$Data))
+likeCIdeath$Output_Var<-"deathIncrease"
+
+likeCIpositive <- data.frame(Data=c(0.1,0.3,seq(1,
+                                   max(subset(predobs.df,
+                                              Output_Var=="positiveIncrease"
+                                              )$Data)),50000))
+likeCIpositive$Prediction.50. <- likeCIpositive$Data
+likeCIpositive$Prediction.2.5. <- qnbinom(0.025,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Prediction.97.5. <- qnbinom(0.975,size=4,
+                                       prob=4/(4+likeCIpositive$Data))
+likeCIpositive$Output_Var<-"positiveIncrease"
+likeCI<-rbind(likeCIpositive,likeCIdeath)
+
+FigS6<-ggplot(predobs.df)+
+  geom_pointrange(aes(x=Data,y=Prediction.50.,
+                      ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,
+                      color=state,group=state),
+                  position=position_jitter(width=0.1))+
+  geom_ribbon(data=likeCI,
+              aes(x=Data,ymin=Prediction.2.5.,
+                      ymax=Prediction.97.5.,fill="CrI"),alpha=0.4)+
+  geom_abline(slope=1,intercept=0)+
+  scale_fill_viridis_d(option="magma",begin = 0.95,end=0.95)+
+  scale_color_viridis_d()+
+  coord_cartesian(xlim=c(0.1,50000),ylim=c(0.1,50000))+
+  scale_x_log10()+
+  scale_y_log10()+facet_grid(~Output_Var,labeller = labeller(Output_Var=obsnames))+
+  ylab("Prediction (95% CrI)")+guides(fill = "none")+
+  theme_bw()+
+  annotation_logticks()
+print(FigS6)
+ggsave("FigS6_06_20.pdf",plot=FigS6,height=3.5,width=8,scale=1.5)
+ggsave("FigS6_06_20.jpeg",plot=FigS6,height=3.5,width=8,scale=1.5)
+```
+
+
+
+```{r contributions to Rt,echo=FALSE,fig.height=4,fig.width=8}
+
+res<-lm(Refft~.,data=scenparms[,c("R0","HygienePwr","ThetaMin",
+                                  "Delta","FracTraced","lambda","rho","Refft")])
+print(summary(res))
+print(anova(res))
+
+phyg<-ggplot(scenparms,aes(x=Refft,y=HygieneFit,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta^eta))+
+  theme(legend.position="none")
+
+phygpwr<-ggplot(scenparms,aes(x=Refft,y=HygienePwr,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(eta))+
+  theme(legend.position="none")
+
+ptheta<-ggplot(scenparms,aes(x=Refft,y=ThetaMin,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta[min]))+
+  theme(legend.position="none")
+
+pDelta<-ggplot(scenparms,aes(x=Refft,y=Delta,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(Delta))+
+  theme(legend.position="none")
+
+preopen<-ggplot(scenparms,aes(x=Refft,y=rMax,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(r[max]))+
+  theme(legend.position="none")
+
+pfc<-ggplot(scenparms,aes(x=Refft,y=FracTraced,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(f[C]))+
+  theme(legend.position="none")
+
+FigS8<-ggarrange(ptheta,phygpwr,
+                 pDelta,pfc,
+                 nrow=2,ncol=2,labels = c("A", "B","C","D"))
+print(FigS8)
+ 
+ggsave("FigS8_corr.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corr.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+```
+
+
+## Impact of different scenarios on daily cases and deaths
+
+
+```{r scenarioplots currentreopening, echo=FALSE,fig.height=4,fig.width=6}
+
+folder <- "../SEIR.reopen.state.2020.07.22"
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+datadatestart<-"2020-03-01"
+preddateend<-"2020-08-15"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+
+p0list <- list()
+# New facet label names 
+DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
+names(DeltaDelta.labs) <- c("0", "0.25")
+mu_Lambda.labs <- c("Testing Rate 1X", "Testing Rate 2X")
+names(mu_Lambda.labs) <- c("1", "2")
+mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
+names(mu_C.labs) <- c("1", "2")
+out.labs <- c("Daily reported cases","Daily confirmed deaths")
+names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+statesplot <- c("NY","OH","TX","WA")
+scen.df <- data.frame(state=sort(rep(statesplot,4)),
+                      mu_C = rep(rep(c(1,1,2,2),1),length(statesplot)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),1),length(statesplot)),
+                      DeltaDelta = rep(rep(0,4),length(statesplot)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta==0.25,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="N_pos"] <- "positiveIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_pos"] <- "deathIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_T"] <- "death"
+  scendat$Output_Var[scendat$Output_Var=="CumPos"] <- "positive"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date>=datadatestart)
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  allscendat<-rbind(allscendat,scendat)
+}
+
+for (statenow in statesplot) {
+  dat.df <- subset(alldat.df,state==statenow)
+  obsdat.df<-subset(dat.df,state==statenow & (
+    Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
+  )) 
+  cumdat.df <- subset(allcumdat.df,state==statenow)
+  obsdat.df<-rbind(obsdat.df,
+                   subset(cumdat.df,state==statenow & (
+    Output_Var == "positive" | Output_Var == "death"
+  )))
+  ## DeltaDelta=0
+  tmpdat<-subset(allscendat,state == statenow & 
+                   (Output_Var=="positiveIncrease" | Output_Var=="deathIncrease") & 
+                   DeltaDelta==0 &
+                   Date >= datadatestart & 
+                   Date <= preddateend)
+  #ymax<-max(tmpdat$Prediction.97.5.,10)
+  rampup.df <- subset(tmpdat,Date==preddateend)
+  p0<-ggplot(tmpdat)+
+    geom_col(aes(x=Date,y=Data),data=subset(obsdat.df,Output_Var=="positiveIncrease"|
+                                              Output_Var=="deathIncrease"))+
+    geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                    fill="CrI"),alpha=0.8)+
+    geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
+                    fill="IQR"),alpha=0.8)+
+    geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
+    ylab("Daily reported cases or deaths")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+    scale_x_date(date_minor_breaks = "1 week",date_breaks = "month",date_labels = "%b")+
+    geom_rect(data=rampup.df,aes(xmin = as.Date("2020-07-01"), xmax = as.Date("2020-07-15"), 
+              ymin=0,ymax=Inf,alpha = "Ramp-up period"))+
+    scale_alpha_manual(values=0.2)+
+    #scale_y_log10(limits=c(1,NA))+
+    facet_grid(Output_Var~mu_C+mu_Lambda,scale="free_y",
+                  labeller = labeller(mu_C = mu_C.labs,
+                                      mu_Lambda = mu_Lambda.labs,
+                                      Output_Var = out.labs))+
+    guides(linetype = guide_legend(order = 1),fill = guide_legend(order = 2),alpha=guide_legend(order=3))+
+          labs(fill="",linetype="Prediction",alpha="")+theme_bw()+theme(legend.position = "bottom")
+  print(p0)
+  p0list[[statenow]]<-p0+ggtitle(statenow)
+}
+
+fig3current<-ggarrange(plotlist=p0list,
+                ncol=2,nrow=2,
+                common.legend = TRUE,
+                legend="bottom",
+                labels=c("A","B","C","D"))
+ggsave("Fig3ABCDcurrent_07_22-08-15.pdf",plot=fig3current,height=4,width=6,scale=2.5)
+ggsave("Fig3ABCDcurrent_07_22-08-15.jpeg",plot=fig3current,height=4,width=6,scale=2.5)
+```
+
+
+```{r scenario Refft, echo=FALSE,fig.height=4,fig.width=6}
+
+
+preddate<-c("2020-07-15")
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+
+# New facet label names 
+DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
+names(DeltaDelta.labs) <- c("0", "0.25")
+mu_Lambda.labs <- c("Testing Rate 1X", "Testing Rate 2X")
+names(mu_Lambda.labs) <- c("1", "2")
+mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
+names(mu_C.labs) <- c("1", "2")
+out.labs <- c("Daily reported cases","Daily confirmed deaths")
+names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+scen.df <- data.frame(state=sort(rep(statesarr,12)),
+                      mu_C = rep(rep(c(1,1,2,2),3),length(statesarr)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statesarr)),
+                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4)),length(statesarr)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta==0.25,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+scen.df$scenfactor <- factor(scen.df$scenariodesc,
+                             levels=rev(head(scen.df$scenariodesc,12)))
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="N_pos"] <- "positiveIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_pos"] <- "deathIncrease"
+  scendat$Output_Var[scendat$Output_Var=="CumDeath"] <- "death"
+  scendat$Output_Var[scendat$Output_Var=="CumPosTest"] <- "positive"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date==preddate)
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  scendat$scenariodesc <- scenrow$scenariodesc
+  scendat$scenfactor <- scenrow$scenfactor
+  allscendat<-rbind(allscendat,scendat)
+}
+
+Reffscendat <- subset(allscendat,Output_Var == "Refft" & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
+Reffscendat$R.le.1 <- as.numeric(Reffscendat$Prediction.75.<1)
+p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
+  theme(legend.position = "bottom")
+print(p)
+#ggsave("heatmap.pdf",p,height=5,width=15)
+Reffscendat.wide<-spread(Reffscendat[,c("state","scenfactor","R.le.1")],scenfactor,R.le.1)
+Grade.df <- data.frame(state=Reffscendat.wide$state)
+Grade.df$value<-"Very High"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
+                 (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+Grade.df$value <- factor(Grade.df$value,levels=
+                           c("None","Low","Moderate","High","Very High"))
+Reffscendat.mat<-as.matrix(Reffscendat.wide[,-1])
+rownames(Reffscendat.mat)<-Reffscendat.wide[,1]
+heatmap(t(Reffscendat.mat),cexRow = 0.5,cexCol = 0.5)
+Reffscendat$stateorder <- factor(Reffscendat$state,
+                                 levels=Grade.df$state[order(Grade.df$value)])
+porder<-ggplot(Reffscendat,aes(stateorder,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")
+#ggsave("heatmaporder.pdf",porder,height=5,width=15)
+
+
+
+
+pusa<-plot_usmap(data = Grade.df, values = "value") + 
+  scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
+  theme(legend.position = "right")
+print(pusa)
+ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
+ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
+
+write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
+```
+
+

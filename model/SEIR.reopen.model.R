@@ -305,7 +305,7 @@ CalcOutputs {
   CFR = (fracpos > fracposmin) ? IFR/fracpos : 0.9; # Adjust infected fatality to (tested) case fatality
   delta = rho * CFR/(1-CFR);
   ## Rt  
-  Rt = c * beta * (1 - FTraced) / (rho + lambda);
+  Rt = c * beta * (1 - FTraced) * ((1 - FAsymp) / (rho + lambda) + FAsymp / rho);
   ## Refft - including herd immunity/contact isolation term
   Refft = S * Rt; 
   ## differentials

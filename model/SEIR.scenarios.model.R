@@ -340,7 +340,7 @@ CalcOutputs {
   # deltatmp = rhotmp * IFR / (1 - IFR);
   # delta = (deltatmp > rho) ? rho : deltatmp;
   ## Rt  
-  Rt = c * beta * (1 - FTraced) / (rho + lambda);
+  Rt = c * beta * (1 - FTraced) * ((1 - FAsymp) / (rho + lambda) + FAsymp / rho);
   ## Refft - including herd immunity/contact isolation term
   Refft = S * Rt; 
   ## differentials
