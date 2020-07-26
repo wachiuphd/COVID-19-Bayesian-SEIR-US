@@ -1,11 +1,11 @@
-/* model/SEIR.reopen.model.R.c
+/* ../model/SEIR.reopen.model.R.c
    ___________________________________________________
 
-   Model File:  model/SEIR.reopen.model.R
+   Model File:  ../model/SEIR.reopen.model.R
 
-   Date:  Sun Jul 26 09:05:46 2020
+   Date:  Sun Jul 26 18:44:33 2020
 
-   Created by:  "MCSim/mod.exe v6.1.0"
+   Created by:  "../MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
    ___________________________________________________
 
@@ -98,8 +98,8 @@
      GM_TLatent = 4;
      GM_TRecover = 10;
      GM_IFR = 0.01;
-     GM_T50Testing = 120;
-     GM_TauTesting = 21;
+     GM_T50Testing = 83;
+     GM_TauTesting = 7;
      GM_TTestingRate = 7;
      GM_TContactsTestingRate = 2;
      GM_FAsymp = 0.295;
@@ -331,9 +331,9 @@
 /*----- Global Variables */
 
 /* For export. Keep track of who we are. */
-char szModelDescFilename[] = "model/SEIR.reopen.model.R";
+char szModelDescFilename[] = "../model/SEIR.reopen.model.R";
 char szModelSourceFilename[] = __FILE__;
-char szModelGenAndVersion[] = "MCSim/mod.exe v6.1.0";
+char szModelGenAndVersion[] = "../MCSim/mod.exe v6.1.0";
 
 /* Externs */
 extern BOOL vbModelReinitd;
@@ -702,8 +702,8 @@ void InitModel(void)
   GM_TLatent = 4;
   GM_TRecover = 10;
   GM_IFR = 0.01;
-  GM_T50Testing = 120;
-  GM_TauTesting = 21;
+  GM_T50Testing = 83;
+  GM_TauTesting = 7;
   GM_TTestingRate = 7;
   GM_TContactsTestingRate = 2;
   GM_FAsymp = 0.295;

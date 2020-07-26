@@ -15,8 +15,8 @@ Level {
   Distrib(GM_TLatent, TruncNormal, 4, 1, 2, 7); # Latency
   Distrib(GM_TRecover, TruncLogNormal, 10, 1.5, 5, 30); # Time to recovery (no longer infectious)
   Distrib(GM_IFR, TruncLogNormal, 0.01, 2, 0.001, 0.1); # Infected fatality rate
-  Distrib(GM_T50Testing, TruncNormal, 120, 60, 60, 180); # Time of 50% of final testing rate
-  Distrib(GM_TauTesting, TruncNormal, 21, 14, 1, 42); # Time constant for testing
+  Distrib(GM_T50Testing, Uniform, 61, 106); # Time of 50% of final testing rate (between March 1 and April 15)
+  Distrib(GM_TauTesting, TruncNormal, 7, 3, 1, 14); # Time constant for testing (1 to 14 days)
   Distrib(GM_TTestingRate, TruncNormal, 7, 3, 2, 12);
   Distrib(GM_TContactsTestingRate, TruncNormal, 2, 1, 1, 3); 
   Distrib(GM_FAsymp, TruncNormal, 0.295, 0.275, 0.02, 0.57); # Fraction asymptomatic
