@@ -1,0 +1,203 @@
+---
+title: "Prediction Figures"
+author: "Weihsueh Chiu"
+date: "`r format(Sys.time(), '%F')`"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(coda)
+library(bayesplot) 
+library(ggplot2)
+library(stringr)
+library(knitr)
+library(ggpubr)
+library(dplyr)
+library(metR)
+library(data.table)
+library(usmap)
+knitr::opts_chunk$set(echo = TRUE, dpi = 300, fig.height=6, fig.width=6,message = FALSE,warning=FALSE)
+functiondir <- "../functions"
+modeldir <- "../model"
+datezero <- "2019-12-31"
+source(file.path(functiondir,"get_reopendata_function.R"))
+```
+
+```{r load parameters, echo=FALSE}
+## Load parameters
+folder <- "../SEIR.reopen.state.2020.07.22"
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+numDate <- as.numeric(as.Date("2020-07-22"))-as.numeric(as.Date(datezero))
+t <- numDate
+allparms <- data.frame()
+allpriors <- data.frame()
+for (statenow in statesarr) { 
+  sampfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*samps.out",
+                         full.names=TRUE)
+  parms <- read.delim(sampfile,as.is=TRUE,sep=" ")
+  names(parms)<-gsub(".1.","",names(parms))
+  names(parms)<-gsub("GM_","",names(parms))
+  parms$state <- factor(statenow,levels=(sort(statesarr)))
+  parms$Log10NInit <- log10(parms$NInit)
+  parms$alpha <- 1/parms$TIsolation
+  parms$kappa <- 1/parms$TLatent
+  parms$rho <- 1/parms$TRecover
+  parms$lambda0 <- parms$TestingCoverage*parms$TestSensitivity/parms$TTestingRate;
+  parms$lambda0_C <- 1.0*parms$TestSensitivity/parms$TContactsTestingRate;
+  parms$rho0_C <- 1.0*(1.0 - parms$TestSensitivity)/parms$TContactsTestingRate;
+  parms$beta0 <- parms$R0 * parms$rho / parms$c0;
+  parms$HygieneMin <- parms$ThetaMin^parms$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  parms$ThetaFit <- (parms$ThetaMin - 
+                        (parms$ThetaMin - 1)*
+                        exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+  ## Reopening - increase contacts/day
+  parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+  parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+  parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+  parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+  ## Contacts/day
+  parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+  ## Hygiene - reduce infection probability/infected contact
+  parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+  parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+  parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+  ## Time dependence of testing/contact tracting
+  parms$TestingTimeDep <- (1-1/(1+exp((t-parms$T50Testing)/parms$TauTesting))); 
+  ## Contact tracing
+  parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+  ## Testing
+  parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+  parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+  parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+  parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+  ## Case fatality
+  parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+  parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+  parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+  parms$Rt <- parms$R0*parms$rho*(1-parms$FTraced)*
+        parms$HygieneFit*parms$c/parms$c0*(
+          (1 - parms$FAsymp)/(parms$rho+parms$lambda)+
+            parms$FAsymp/parms$rho)
+  allparms <- rbind(allparms,parms)
+  
+  
+  ## Load priors
+  priorfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*MTC.out",
+                         full.names=TRUE)
+  priors <- read.delim(priorfile,as.is=TRUE)
+  priors <- priors[,names(priors)!="NInit_1.1"]
+  names(priors)<-gsub("GM_","",names(priors))
+  priors$state <- factor(statenow,levels=(sort(statesarr)))
+  priors$Log10NInit <- log10(priors$NInit)
+  priors$alpha <- 1/priors$TIsolation
+  priors$kappa <- 1/priors$TLatent
+  priors$rho <- 1/priors$TRecover
+  priors$lambda0 <- priors$TestingCoverage*priors$TestSensitivity/priors$TTestingRate;
+  priors$lambda0_C <- 1.0*priors$TestSensitivity/priors$TContactsTestingRate;
+  priors$rho0_C <- 1.0*(1.0 - priors$TestSensitivity)/priors$TContactsTestingRate;
+  priors$beta0 <- priors$R0 * priors$rho / priors$c0;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+
+  priors$HygieneMin <- priors$ThetaMin^priors$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+  ## Reopening - increase contacts/day
+  priors$TimeReopen = 60+priors$TauTheta+priors$TauS;
+  priors$ReopenStart = (1 - 1/(1 + exp(4*(t - priors$TimeReopen))));
+  priors$ReopenStop =  (1 - 1/(1 + exp(4*(t - (priors$TimeReopen+priors$TauR)))));
+  priors$ReopenPct = ((t - priors$TimeReopen)*(priors$rMax/priors$TauR)*
+                        (priors$ReopenStart-priors$ReopenStop)+priors$rMax*priors$ReopenStop);
+  names(priors)[names(priors)=="Iter"]<-"iter"
+  allpriors <- rbind(allpriors,priors)
+  
+}
+allparms.med<-aggregate(.~state,data=allparms,median)
+allparms$Region <- fips_table[allparms$state,"Region"]
+allparms.med$Region <- fips_table[allparms.med$state,"Region"]
+allparms$Category <- fips_table[as.character(allparms$state),"RtCategory"]
+allparms.med$Category <- fips_table[as.character(allparms.med$state),"RtCategory"]
+
+```
+
+```{r supplemental file with all priors and posteriors}
+parmstoplot<-c("Log10NInit",
+               "alpha",
+               "R0",
+               "c0",
+               "kappa",
+               "rho",
+               "IFR",
+               "T50Testing",
+               "TauTesting",
+               "TTestingRate",
+               "TContactsTestingRate",
+               "FAsymp",
+               "TestingCoverage",
+               "TestSensitivity",
+               "ThetaMin",
+               "TauTheta",
+               "PwrTheta",
+               "HygienePwr",
+               "TauS",
+               "ReopenPct",
+               "TauR",
+               "FracTraced",
+               "TPosTest",
+               "TFatalDeath",
+               "alpha_Pos",
+               "alpha_Death")
+idvars<-c("iter","state","Region")
+allparms.df <- allparms[,(names(allparms) %in% c(idvars,parmstoplot))]
+allparms.df <- melt(as.data.table(allparms.df),id.vars=idvars)
+allparms.df$variable<-factor(allparms.df$variable,
+                             levels=parmstoplot)
+allpriors.df <- allpriors[,(names(allpriors) %in% c(idvars,parmstoplot))]
+allpriors.df <- melt(as.data.table(allpriors.df),id.vars=c("iter","state"))
+pdf("FigS7_Priors_Posteriors_byState_07-22.pdf")
+for (statenow in statesarr) { 
+  p<-ggplot(subset(allparms.df,state==statenow),aes(x=value)) +
+      geom_histogram(aes(y=..density..,fill="Posterior")) +
+      geom_density(aes(fill="Prior"),alpha=0.6, 
+                   data=subset(allpriors.df,state==statenow)) + 
+    theme_bw()+theme(legend.position = "bottom")+
+    guides(fill = guide_legend(reverse = TRUE))+
+    labs(fill="")+ggtitle(statenow)+
+    scale_fill_viridis_d(begin=0,end=0.8,option="magma")+
+    facet_wrap(~variable,scales="free")
+  print(p)
+}
+dev.off()
+```
+
+
+
+

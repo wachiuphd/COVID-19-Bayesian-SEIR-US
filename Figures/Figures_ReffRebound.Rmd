@@ -1,0 +1,398 @@
+---
+title: "ReffRebound Figures"
+author: "Weihsueh Chiu"
+date: "`r format(Sys.time(), '%F')`"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(coda)
+library(bayesplot) 
+library(ggplot2)
+library(stringr)
+library(knitr)
+library(ggpubr)
+library(dplyr)
+library(metR)
+library(data.table)
+library(usmap)
+knitr::opts_chunk$set(echo = TRUE, dpi = 300, fig.height=6, fig.width=6,message = FALSE,warning=FALSE)
+functiondir <- "../functions"
+modeldir <- "../model"
+datezero <- "2019-12-31"
+source(file.path(functiondir,"get_reopendata_function.R"))
+folder <- "../SEIR.reopen.state.2020.07.22"
+preddate <- "2020-07-22"
+preddateend <- "2020-09-15"
+```
+
+## Load results
+
+```{r load full results, echo=FALSE, include=FALSE}
+
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+fips_table$Region <- "South"
+fips_table$Region[fips_table$Alpha.code %in% c("CT","ME","MA","NH","RI",
+                                               "VT","NJ","NY","PA")] <- "Northeast"
+fips_table$Region[fips_table$Alpha.code %in% c("IL","IN","MI","OH","WI","IA",
+                                               "KS","MN","MO","NE","ND","SD")] <- "Midwest"
+fips_table$Region[fips_table$Alpha.code %in% c("AZ","CO","ID","MT","NV","NM","UT","WY",
+                                               "AK","CA","HI","OR","WA")] <- "West"
+
+statesarr <- fips_table$Alpha.code[2:52]
+## Read prediction files
+
+allpreddat <- data.frame()
+for (statenow in statesarr) { 
+  csvfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*prediction.quantiles.csv",
+                         full.names=TRUE)
+  preddat <- read.csv(csvfile,as.is=TRUE)
+  preddat$state <- statenow
+  allpreddat <- rbind(allpreddat,preddat)
+}
+allpreddat$Output_Var[allpreddat$Output_Var=="N_pos"] <- "positiveIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="D_pos"] <- "deathIncrease"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumPosTest"] <- "positive"
+allpreddat$Output_Var[allpreddat$Output_Var=="CumDeath"] <- "death"
+allpreddat$Date <- as.Date(allpreddat$Time,origin=as.Date(datezero))
+
+## Read data files
+alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
+alldat.df$Date <- as.Date(alldat.df$numDate,origin=as.Date(datezero))
+names(alldat.df)[names(alldat.df)=="variable"] <- "Output_Var"
+names(alldat.df)[names(alldat.df)=="value"] <- "Data"
+
+allcumdat.df <- read.csv(file.path(folder,"CUMULTESTDATA.csv"))
+allcumdat.df$Date <- as.Date(allcumdat.df$numDate,origin=as.Date(datezero))
+names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
+names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
+
+# get reopening data
+reopen.df <- get_reopendata(datadir = "../data")
+minreopen<-aggregate(value~State.Abbr,data=reopen.df,min,na.rm=TRUE)
+rownames(minreopen)<-minreopen$State.Abbr
+```
+
+
+## Refft at min 
+
+```{r Refft at minimum, echo=FALSE,fig.height=3,fig.width=6}
+
+preddat.minRt.df<-subset(allpreddat,Output_Var=="Refft" & 
+                           Date <= as.Date(preddate)) %>% 
+  group_by(state) %>% 
+  slice(which.min(Prediction.50.))
+preddat.minRt.df$Category <- "R[eff](t) ~ 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.minRt.df$Category[preddat.minRt.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.minRt.df$Category<-factor(preddat.minRt.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.minRt.df)<- preddat.minRt.df$state
+pReffMin <- ggplot(preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Minimum value of ",R[eff](t),)))
+print(pReffMin)
+# ggsave("Refft.Min.pdf",plot=pReffMin,height=3,width=6,scale=1.75)
+# ggsave("Refft.Min.jpeg",plot=pReffMin,height=3,width=6,scale=1.75)
+```
+
+```{r Refft prediction date, echo=FALSE,fig.height=3,fig.width=6}
+preddat.df <- subset(allpreddat,Output_Var=="Refft")
+preddat.df <- preddat.df[preddat.df$Date==as.Date(preddate),]
+preddat.df$Category <- "R[eff](t) ~ 1"
+preddat.df$Category[preddat.df$Prediction.75.<1] <- "R[eff](t) < 1"
+preddat.df$Category[preddat.df$Prediction.25.>1] <- "R[eff](t) > 1"
+preddat.df$Category<-factor(preddat.df$Category,
+                            levels=
+                              c("R[eff](t) < 1","R[eff](t) ~ 1","R[eff](t) > 1"))
+rownames(preddat.df)<- preddat.df$state
+pReffnow <- ggplot(preddat.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," on ",.(preddate))))
+print(pReffnow)
+
+fips_table$RtCategory <- preddat.df[fips_table$Alpha.code,"Category"]
+```
+
+```{r combined with min, echo=FALSE,fig.height=3,fig.width=6}
+pReffcombmin <- ggplot()+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),alpha=0.5,color="grey60",
+               stat="identity",data=preddat.minRt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity",data=preddat.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+    xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  geom_text(aes(x=state,y=0,label=Date,angle=90),
+            data=preddat.minRt.df,color="grey40",
+            hjust=0.25,size=2)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," at min and on ",.(preddate))))
+print(pReffcombmin)
+# ggsave("Refft.comb.min.pdf",plot=pReffcombmin,height=3,width=6,scale=1.75)
+# ggsave("Refft.comb.min.jpeg",plot=pReffcombmin,height=3,width=6,scale=1.75)
+
+```
+
+
+```{r load parameters, echo=FALSE}
+## Load parameters
+numDate <- as.numeric(as.Date(preddate))-as.numeric(as.Date(datezero))
+t <- numDate
+allparms <- data.frame()
+allpriors <- data.frame()
+for (statenow in statesarr) { 
+  sampfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*samps.out",
+                         full.names=TRUE)
+  parms <- read.delim(sampfile,as.is=TRUE,sep=" ")
+  names(parms)<-gsub(".1.","",names(parms))
+  names(parms)<-gsub("GM_","",names(parms))
+  parms$state <- factor(statenow,levels=(sort(statesarr)))
+  parms$Log10NInit <- log10(parms$NInit)
+  parms$alpha <- 1/parms$TIsolation
+  parms$kappa <- 1/parms$TLatent
+  parms$rho <- 1/parms$TRecover
+  parms$lambda0 <- parms$TestingCoverage*parms$TestSensitivity/parms$TTestingRate;
+  parms$lambda0_C <- 1.0*parms$TestSensitivity/parms$TContactsTestingRate;
+  parms$rho0_C <- 1.0*(1.0 - parms$TestSensitivity)/parms$TContactsTestingRate;
+  parms$beta0 <- parms$R0 * parms$rho / parms$c0;
+  parms$HygieneMin <- parms$ThetaMin^parms$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  parms$ThetaFit <- (parms$ThetaMin - 
+                        (parms$ThetaMin - 1)*
+                        exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+  ## Reopening - increase contacts/day
+  parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+  parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+  parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+  parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+  ## Contacts/day
+  parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+  ## Hygiene - reduce infection probability/infected contact
+  parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+  parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+  parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+  ## Time dependence of testing/contact tracting
+  parms$TestingTimeDep <- (1-1/(1+exp((t-parms$T50Testing)/parms$TauTesting))); 
+  ## Contact tracing
+  parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+  ## Testing
+  parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+  parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+  parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+  parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+  ## Case fatality
+  parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+  parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+  parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+  parms$Rt <- parms$R0*parms$rho*(1-parms$FTraced)*
+        parms$HygieneFit*parms$c/parms$c0*(
+          (1 - parms$FAsymp)/(parms$rho+parms$lambda)+
+            parms$FAsymp/parms$rho)
+  allparms <- rbind(allparms,parms)
+  ## Load priors
+  priorfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*MTC.out",
+                         full.names=TRUE)
+  priors <- read.delim(priorfile,as.is=TRUE)
+  priors <- priors[,names(priors)!="NInit_1.1"]
+  names(priors)<-gsub("GM_","",names(priors))
+  priors$state <- factor(statenow,levels=(sort(statesarr)))
+  priors$Log10NInit <- log10(priors$NInit)
+  priors$alpha <- 1/priors$TIsolation
+  priors$kappa <- 1/priors$TLatent
+  priors$rho <- 1/priors$TRecover
+  priors$lambda0 <- priors$TestingCoverage*priors$TestSensitivity/priors$TTestingRate;
+  priors$lambda0_C <- 1.0*priors$TestSensitivity/priors$TContactsTestingRate;
+  priors$rho0_C <- 1.0*(1.0 - priors$TestSensitivity)/priors$TContactsTestingRate;
+  priors$beta0 <- priors$R0 * priors$rho / priors$c0;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+
+  priors$HygieneMin <- priors$ThetaMin^priors$HygienePwr;
+  ## Time dependent parameters, evaluated at last day
+  priors$ThetaFit <- (priors$ThetaMin - 
+                        (priors$ThetaMin - 1)*
+                        exp(-((t-60)/priors$TauTheta)^priors$PwrTheta));
+  ## Reopening - increase contacts/day
+  priors$TimeReopen = 60+priors$TauTheta+priors$TauS;
+  priors$ReopenStart = (1 - 1/(1 + exp(4*(t - priors$TimeReopen))));
+  priors$ReopenStop =  (1 - 1/(1 + exp(4*(t - (priors$TimeReopen+priors$TauR)))));
+  priors$ReopenPct = ((t - priors$TimeReopen)*(priors$rMax/priors$TauR)*(priors$ReopenStart-priors$ReopenStop)+priors$rMax*priors$ReopenStop);
+  names(priors)[names(priors)=="Iter"]<-"iter"
+  allpriors <- rbind(allpriors,priors)
+  
+}
+allparms.med<-aggregate(.~state,data=allparms,median)
+allparms$Region <- fips_table[allparms$state,"Region"]
+allparms.med$Region <- fips_table[allparms.med$state,"Region"]
+allparms$Category <- fips_table[as.character(allparms$state),"RtCategory"]
+allparms.med$Category <- fips_table[as.character(allparms.med$state),"RtCategory"]
+
+```
+
+```{r transmission rebound, echo=FALSE,fig.height=6,fig.width=6}
+prebound <- ggplot(allparms)+
+  geom_col(aes(x=state,y=100*Delta,fill=Category),data=allparms.med)+
+  geom_boxplot(aes(x=state,y=100*Delta),alpha=0,outlier.shape = NA)+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+xlab("")+
+  ylim(0,100)+
+  ylab(bquote(Delta(t)))+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="bottom")+
+#  geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
+  ggtitle(bquote(paste("Transmission Rebound ",Delta," estimated ",.(preddate))))
+print(prebound)
+
+figReffRebound<-ggarrange(pReffcombmin,prebound,
+                  nrow=2,heights=c(2,1),labels = c("A", "B"))
+print(figReffRebound)
+ggsave("Fig2_ReffRebound.pdf",plot=figReffRebound,height=4,width=6,scale=1.75)
+ggsave("Fig2_ReffRebound.jpeg",plot=figReffRebound,height=4,width=6,scale=1.75)
+```
+
+
+```{r contributions to Rt,echo=FALSE,fig.height=8,fig.width=8}
+
+res<-lm(Rt~.,data=allparms[,c("R0","HygienePwr","ThetaMin",
+                                  "rMax","FracTraced","FAsymp","lambda","rho","Rt")])
+print(summary(res))
+print(anova(res))
+
+phyg<-ggplot(allparms,aes(x=Rt,y=HygieneFit,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta^eta))+
+  theme(legend.position="none")
+
+phygpwr<-ggplot(allparms,aes(x=Rt,y=HygienePwr,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(eta))+
+  theme(legend.position="none")
+
+ptheta<-ggplot(allparms,aes(x=Rt,y=ThetaMin,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta[min]))+
+  theme(legend.position="none")
+
+pDelta<-ggplot(allparms,aes(x=Rt,y=Delta,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(Delta))+
+  theme(legend.position="none")
+
+preopen<-ggplot(allparms,aes(x=Rt,y=rMax,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(r[max]))+
+  theme(legend.position="none")
+
+pfc<-ggplot(allparms,aes(x=Rt,y=FracTraced,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(f[C]))+
+  theme(legend.position="none")
+
+ptesting<-ggplot(allparms,aes(x=Rt,y=lambda,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(lambda))+
+  theme(legend.position="none")
+
+FigS8<-ggarrange(preopen,pfc,
+                 ptesting, phygpwr,
+                 nrow=2,ncol=2,labels = c("A", "B","C","D"))
+print(FigS8)
+ 
+ggsave("FigS8_corr.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corr.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+```

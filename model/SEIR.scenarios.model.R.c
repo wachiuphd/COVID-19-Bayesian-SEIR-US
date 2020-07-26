@@ -3,7 +3,7 @@
 
    Model File:  model/SEIR.scenarios.model.R
 
-   Date:  Sun Jul 26 05:10:39 2020
+   Date:  Sun Jul 26 12:34:56 2020
 
    Created by:  "MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
@@ -1058,7 +1058,7 @@ void CalcOutputs (double  rgModelVars[], double  rgDerivs[], PDOUBLE pdTime)
   CFR = ( fracpos > fracposmin ) ? IFR / fracpos : 0.9 ;
   rgModelVars[ID_delta] = rho * CFR / ( 1 - CFR ) ;
 
-  rgModelVars[ID_Rt] = rgModelVars[ID_c] * rgModelVars[ID_beta] * ( 1 - rgModelVars[ID_FTraced] ) / ( rho + rgModelVars[ID_lambda] ) ;
+  rgModelVars[ID_Rt] = rgModelVars[ID_c] * rgModelVars[ID_beta] * ( 1 - rgModelVars[ID_FTraced] ) * ( ( 1 - FAsymp ) / ( rho + rgModelVars[ID_lambda] ) + FAsymp / rho ) ;
 
   rgModelVars[ID_Refft] = rgModelVars[ID_S] * rgModelVars[ID_Rt] ;
 

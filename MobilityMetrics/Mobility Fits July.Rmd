@@ -1,0 +1,690 @@
+---
+title: "Mobility Fits"
+author: "Weihsueh Chiu"
+date: 07/23/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.height=7,fig.width=7,dpi = 300)
+library(tidyverse)
+library(covid19us)
+library(jsonlite)
+library(rvest)
+library(data.table)
+library(RCurl)
+library(nlme)
+library(minpack.lm)
+library(ggpubr)
+datezero<-"2019-12-31"
+datemax<-as.numeric(as.Date("2020-07-22")) -as.numeric(as.Date(datezero))
+fit0datemax<-as.numeric(as.Date("2020-04-10")) -as.numeric(as.Date(datezero))
+datadir <- "../data"
+get_fips2 <- function(datadir="../data") {
+  fips_url<-"https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code"
+  fips_table<-fips_url%>%
+    read_html()%>%
+    html_nodes(xpath='//*[@id="mw-content-text"]/div/table[1]')%>%
+    html_table%>%
+    as.data.frame()%>%
+    filter(Alpha.code!="")%>%
+    mutate(Numeric.code=as.character(Numeric.code))%>%
+    mutate(Numeric.code=str_pad(Numeric.code, width=2, side="left", pad="0"))
+  fips_table$numFIPS <- as.numeric(fips_table$Numeric.code)
+  fips_table <- subset(fips_table,numFIPS<=56)
+  pop<-read.csv(file.path(datadir,"SCPRC-EST2019-18+POP-RES.csv"))
+  pop <- subset(pop,STATE <=56)
+  rownames(pop) <- as.character(pop$STATE)
+  fips_table$pop <- pop[as.character(fips_table$numFIPS),"POPESTIMATE2019"]
+  fips_table <- rbind(data.frame(Name="United States",
+                                 Alpha.code="US",
+                                 Numeric.code="00",
+                                 Status="Country",
+                                 numFIPS=0,
+                                 pop=pop$POPESTIMATE2019[
+                                   pop$STATE==0
+                                   ]),
+                      fips_table)
+  rownames(fips_table) <- fips_table$Alpha.code
+  return(fips_table)
+}
+
+get_udata_states <- function(fips_table,
+                             datezero='2019-12-31',
+                             datadir="../data") {
+  fips_vec<-fips_table$Numeric.code
+  row.names(fips_table)<-fips_table$Alpha.code
+  fname<-file.path(datadir,paste0("UDATA-v3-full-state.",Sys.Date(),".csv"))
+  if (file.exists(fname)) {
+    udata<-read.csv(fname,as.is=TRUE,colClasses = c(rep("character",2),
+                                                    rep("numeric",3)))
+  } else {
+    l<-list()
+    for (i in 1:length(fips_vec)){
+      l[[i]]<-fromJSON(paste0("https://covid19-scoreboard-api.unacastapis.com/api/search/covidstateaggregates_v3?q=stateFips:",fips_vec[i],"&size=10000"))
+    }
+    m<- Filter(function(x){length(x)>0 && x[["hits"]][["total"]][["value"]] > 0},l)
+    unacast_list<-list()
+    for (i in 1:length(m)){
+      temp<-m[[i]]
+      names(temp$hits$hits$`_source`$data)<-temp$hits$hits$`_source`$stateFips
+      unacast_list[[i]]<-rbindlist(temp$hits$hits$`_source`$data,idcol = T)%>%
+        select(.id,date,totalGrade,travelDistanceMetric,visitationMetric,encountersMetric)%>%
+        group_by(.id)
+    }
+    unacast_df<-as.data.frame(rbindlist(unacast_list))
+    udata <- unacast_df[,-3]
+    write.csv(udata,fname,row.names=FALSE)
+  }
+  udata$date <- as.Date(udata$date)
+  udata$numFIPS <- as.numeric(udata$.id)
+  udata <- subset(udata,(numFIPS <= 56))
+  rownames(fips_table) <- as.character(fips_table$Numeric.code)
+  udata$State.Abbr <- fips_table[udata$.id,"Alpha.code"]
+  udata$numDate <- as.numeric(as.Date(udata$date))-
+    as.numeric(as.Date(datezero))
+  udata$travelDistanceMetric<-udata$travelDistanceMetric+1
+  udata$visitationMetric<-udata$visitationMetric+1
+  udata$encountersMetric<-udata$encountersMetric+1
+  names(udata)[names(udata)=="travelDistanceMetric"]<-"UnacastTravelDistance"
+  names(udata)[names(udata)=="visitationMetric"]<-"UnacastVisitation"
+  names(udata)[names(udata)=="encountersMetric"]<-"UnacastEncounters"
+  udata.df <- melt(as.data.table(udata),
+                   id.vars=c(".id","date","State.Abbr",
+                             "numFIPS","numDate"),
+                   measure.vars=c("UnacastTravelDistance",
+                                  "UnacastVisitation",
+                                  "UnacastEncounters"
+                                  ))
+  udata.df <- udata.df[order(udata.df$variable,udata.df$numDate,
+                             udata.df$numFIPS),]
+  return(udata.df)
+}
+
+func0 <- function(t,ys,thetamin,tautheta,ntheta) {
+  s <- exp(-((t-60)/tautheta)^ntheta)
+  y <- ys*(thetamin + (1-thetamin)*s)
+  return(y)
+}
+func1 <- function(t,ys,thetamin,tausalt,taur,rmax) {
+  tr <- 60 + tausalt
+  utr <- 1 - 1/(1+exp(1*(t - tr)))
+  utrtaur <- 1 - 1/(1+exp(1*(t - (tr+taur))))
+  r <- (t - tr) * (rmax/taur) * (utr - utrtaur) + rmax*utrtaur
+  y <- ys*(thetamin + (1-thetamin)*r)
+  return(y)
+}
+  
+func2 <- function(t,ys,thetamin,tautheta,ntheta,taus,taur,rmax) {
+  s <- exp(-((t-60)/tautheta)^ntheta)
+  tr <- 60 + tautheta + taus
+  utr <- 1 - 1/(1+exp(2*(t - tr)))
+  utrtaur <- 1 - 1/(1+exp(2*(t - (tr+taur))))
+  r <- (t - tr) * (rmax/taur) * (utr - utrtaur) + rmax*utrtaur
+  y <- ys*(thetamin + (1-thetamin)*(s + r))
+  return(y)
+}
+
+func <- function(t,ys,thetamin,tautheta,ntheta,taus,taur,rmax) {
+  s <- exp(-((t-60)/tautheta)^ntheta)
+  tr <- 60 + tautheta + taus
+  utr <- 1 - 1/(1+exp(4*(t - tr)))
+  utrtaur <- 1 - 1/(1+exp(4*(t - (tr+taur))))
+  r <- (t - tr) * (rmax/taur) * (utr - utrtaur) + rmax*utrtaur
+  y <- ys*(thetamin + (1-thetamin)*(s + r))
+  return(y)
+}
+
+mobfit <- function(mdata.df,pdfname="",showplots=TRUE,
+                   minmaxinit = FALSE, parms0 = NA) {
+  mfits.df <- subset(mdata.df,numDate >= 60)
+  mfits.df$fit <- 0
+  mfits.df$ys <- 0
+  mfits.df$thetamin <- 0
+  mfits.df$tautheta <- 0
+  mfits.df$ntheta <- 0
+  mfits.df$taus <- 0
+  mfits.df$taur <- 0
+  mfits.df$rmax <- 0
+  statenow<-"DE"
+  #varnow<-"travelDistanceMetric"
+  for (statenow in unique(as.character(mfits.df$State.Abbr))) {
+    for (varnow in unique(as.character(mfits.df$variable))) {
+      dattmp<-subset(mfits.df,State.Abbr==statenow &
+                             variable==varnow)
+      dattmp$value <- runmed(dattmp$value,7,endrule="constant")
+      dattmp0<-subset(dattmp,numDate <= fit0datemax)
+      ys0<-mean(first(dattmp0$value,5))
+      thetamin0<-mean(subset(dattmp0,date >= "2020-03-30" & 
+                                   date <= "2020-04-03")$value)/ys0
+      tautheta0<-20
+      ntheta0<-10
+      # plot(dattmp0$numDate,dattmp0$value)
+      # lines(dattmp0$numDate,func0(dattmp0$numDate,
+      #                            ys0,
+      #                            thetamin0,
+      #                            tautheta0,
+      #                            ntheta0),lty=2)
+      fittmp0<-nlsLM(value~func0(numDate,ys,thetamin,tautheta,ntheta),
+               data=dattmp0,
+               start = list(ys = ys0,
+                            thetamin = thetamin0, 
+                            tautheta = tautheta0,
+                            ntheta = ntheta0))
+      # lines(dattmp0$numDate,predict(fittmp0),lwd=2)
+      ys0<-coef(fittmp0)["ys"]
+      thetamin0<-coef(fittmp0)["thetamin"]
+      tautheta0<-coef(fittmp0)["tautheta"]
+      ntheta0<-coef(fittmp0)["ntheta"]
+      #####
+      dattmp1<-subset(dattmp,numDate > (fit0datemax-10))
+      #thetamin1<-mean(mean(first(dattmp1$value,7)))/ys0
+      thetamin1<-min(dattmp1$value)/ys0
+      if (minmaxinit) {
+        tausalt0 <- min(dattmp1$numDate[
+          which(dattmp1$value > 
+            (min(dattmp1$value) + 
+               0.1*(max(dattmp1$value)-min(dattmp1$value))))]) - 60
+        taur0 <- max(dattmp1$numDate[
+          which(dattmp1$value < 
+            (min(dattmp1$value) + 
+               0.9*(max(dattmp1$value)-min(dattmp1$value))))]) - tausalt0 - 60
+        taur0 <- max(7,taur0)
+
+      } else {
+        tausalt0<-fit0datemax+5-60
+        taur0 <- max(7,last(dattmp1$numDate)-tausalt0-60-10)
+      }
+      rmax0<-((mean(data.table::last(dattmp1$value,5))/ys0)-thetamin1)/(1-thetamin1)
+      # plot(dattmp1$numDate,dattmp1$value)
+      # lines(dattmp1$numDate,func1(dattmp1$numDate,
+      #                            ys0,
+      #                            thetamin0,
+      #                            tausalt0,
+      #                            taur0,
+      #                            rmax0),lty=2)
+      if (is.character(try(
+        fittmp1<-nlsLM(value~func1(numDate,ys0,thetamin,tausalt,taur,rmax),
+               data=dattmp1,
+               start = list(thetamin = thetamin1,
+                            tausalt = tausalt0,
+                            taur = taur0,
+                            rmax = rmax0)),TRUE))) {
+        print(paste("Error fit1",statenow,varnow))
+        plot(dattmp1$numDate,dattmp1$value)
+        lines(dattmp1$numDate,func1(dattmp1$numDate,
+                                   ys0,
+                                   thetamin1,
+                                   tausalt0,
+                                   taur0,
+                                   rmax0),lty=2)
+                            }
+      # lines(dattmp1$numDate,predict(fittmp1))
+      thetamin0 <- mean(thetamin0,coef(fittmp1)["thetamin.ys"])
+      taus0<-coef(fittmp1)["tausalt"]-tautheta0
+      taur0<-coef(fittmp1)["taur"]
+      rmax0<-coef(fittmp1)["rmax.ys"]
+      #taus0<- 28 # 5 fails
+      #taur0<-max(7,last(dattmp$numDate)-tautheta0-taus0-60)
+      # rmax0<-((mean(last(dattmp$value,5))/ys0)-thetamin0)/
+      #   (1-thetamin0)
+      # plot(dattmp$numDate,dattmp$value)
+      # lines(dattmp$numDate,func(dattmp$numDate,ys0,thetamin0,tautheta0,ntheta0,
+      #                           taus0,taur0,rmax0),lty=2)
+      if(is.character(try({
+        if (is.na(parms0)[1]) {
+          fittmp2<-nlsLM(value~func2(numDate,ys,thetamin,tautheta,ntheta,
+                                   taus,taur,rmax),
+                 data=dattmp,
+                 start = list(ys = ys0,
+                              thetamin = thetamin0, 
+                              tautheta = tautheta0,
+                              ntheta = ntheta0,
+                              taus = taus0,
+                              taur = taur0,
+                              rmax = rmax0));
+          fittmp<-nlsLM(value~func(numDate,ys,thetamin,tautheta,ntheta,
+                                   taus,taur,rmax),
+                 data=dattmp,
+                 start = list(ys = coef(fittmp2)[1],
+                              thetamin = coef(fittmp2)[2], 
+                              tautheta = coef(fittmp2)[3],
+                              ntheta = coef(fittmp2)[4],
+                              taus = coef(fittmp2)[5],
+                              taur = coef(fittmp2)[6],
+                              rmax = coef(fittmp2)[7]));
+        } else {
+          parmstmp <- subset(parms0,State.Abbr==statenow & MobilityMetric ==varnow)
+          parmstmp.value <- parmstmp$value
+          names(parmstmp.value) <- parmstmp$variable
+          fittmp<-nlsLM(value~func(numDate,ys,thetamin,tautheta,ntheta,
+                                   taus,taur,rmax),
+                 data=dattmp,
+                 start = list(ys = 10^parmstmp.value["log10ys"],
+                              thetamin = parmstmp.value["thetamin"], 
+                              tautheta = parmstmp.value["tautheta"],
+                              ntheta = parmstmp.value["ntheta"],
+                              taus = parmstmp.value["taus"],
+                              taur = parmstmp.value["taur"],
+                              rmax = parmstmp.value["rmax"]));
+        }
+      rowsnow<-mfits.df$State.Abbr==statenow &
+                            mfits.df$variable==varnow;
+      mfits.df[rowsnow,"fit"]<-predict(fittmp);#func(dattmp$numDate,
+                                    #coef(fittmp)[1],
+                                    #coef(fittmp)[2],
+                                    #coef(fittmp)[3],
+                                    #coef(fittmp)[4],
+                                    #coef(fittmp)[5],
+                                    #coef(fittmp)[6],
+                                    #coef(fittmp)[7]
+                                    #);#predict(fittmp);
+      mfits.df[rowsnow,"ys"]<-coef(fittmp)[1];# ["ys"];
+      mfits.df[rowsnow,"thetamin"]<-coef(fittmp)[2]; #["thetamin"];
+      mfits.df[rowsnow,"tautheta"]<-coef(fittmp)[3]; #["tautheta"];
+      mfits.df[rowsnow,"ntheta"]<-coef(fittmp)[4]; #["ntheta"];
+      mfits.df[rowsnow,"taus"]<-coef(fittmp)[5]; #["taus"];
+      mfits.df[rowsnow,"taur"]<-coef(fittmp)[6]; #["taur"];
+      mfits.df[rowsnow,"rmax"]<-coef(fittmp)[7]; #["rmax"];
+      }))) {
+        print(paste("Error fit",statenow,varnow))
+        plot(dattmp$numDate,dattmp$value)
+        lines(dattmp$numDate,func(dattmp$numDate,ys0,thetamin0,tautheta0,ntheta0,
+                                  taus0,taur0,rmax0),lty=2)
+      }
+    }
+  }
+  plist<-list()
+  if (pdfname!="") {
+    pdf(pdfname,height=8.5,width=11)
+    for (varnow in unique(as.character(mfits.df$variable))) {
+      p<-ggplot(subset(mdata.df,variable==varnow))+
+               geom_point(aes(x=date,y=value))+
+        geom_point(aes(x=as.Date(60+tautheta+taus,origin=datezero),
+                       y=fit),color="red",
+                   data=subset(mfits.df[mfits.df$numDate==
+                                          round(60+mfits.df$tautheta+mfits.df$taus),],
+                               variable==varnow))+
+                 geom_line(aes(x=date,y=fit),color="red",
+                           data=subset(mfits.df,variable==varnow))+
+                 facet_wrap(~State.Abbr,scales="free")+
+                 geom_vline(aes(xintercept=value,linetype=ReopenType,
+                                color=ReopenType),
+                            data=reopendat.df)+
+                 theme(legend.position = "bottom")
+      print(p+ggtitle(varnow))
+      plist<-c(plist,list(p+ggtitle(varnow)))
+    }
+    dev.off()
+  }
+
+  if (showplots) {
+    for (j in 1:length(plist)) {
+      print(plist[[j]])
+    }
+  }
+  return(mfits.df)
+}
+
+## Load FIPS
+fipsname<-file.path(datadir,"FIPS_TABLE2.csv")
+if (file.exists(fipsname)) {
+  fips_table<-read.csv(fipsname,as.is=TRUE,row.names=1,
+                       colClasses = c(rep("character",5),rep("numeric",2)))
+} else {
+  fips_table<-get_fips2()
+  write.csv(fips_table,file=fipsname)
+}
+
+## Load re-opening times as documented by Washington Post.
+
+reopendat <- read.csv(file.path(datadir,"ReopeningData.csv"),as.is=TRUE)
+names(reopendat)[2]<-"State.Abbr"
+reopendat[reopendat==""]<-NA
+for (j in 4:10) reopendat[[j]]<-as.Date(reopendat[[j]])
+reopendat.df <- melt(as.data.table(reopendat),id.vars=1:3)
+names(reopendat.df)[4]<-"ReopenType"
+reopendat.df$numDate <- as.numeric(reopendat.df$value)-
+    as.numeric(as.Date(datezero))
+
+## Load previous fits
+mobparms0 <- fread("MobilityParms.csv")
+```
+
+## Mobility data
+
+Each mobility dataset for each state is Fit to Weibull+linear model, where the Weibull represents the process of sheltering in place, and linear represents the re-opening phase.  The model is formulated as follows:
+
+$$
+y  = y_s\left\{\theta_{min}+(1-\theta_{min})\cdot\left[s(t) + r(t)\right]\right\} 
+$$
+
+$$
+s(t)  =  \exp\left[-(t/\tau_\theta)^{n_\theta}\right]
+$$
+
+$$
+r(t)  =  r_{max}\frac{t-\tau_\theta-\tau_s}{\tau_r}\left[
+u(t-t_r)-
+u(t-t_{rmax})\right] + u(t-t_{rmax})
+$$
+$$
+u(t)  =  \text{Heaviside}(t)\approx 1 - \frac{1}{1+e^{4t}}
+$$
+$$
+t_r  =  \tau_\theta+\tau_s
+$$
+$$
+t_{rmax}  =  \tau_\theta+\tau_s+\tau_r
+$$
+  
+Here $y_s$ represents the baseline (pre-pandemic) value, and the Weibull term has parameters $\theta_{min}$, $\tau_\theta$, and $n_\theta$.  The "reopening" term $r(t)$ is 0 prior to $t_r$, linear between $t_r$ and $t_{rmax}$, and constant at a value of $r_{max}$ after that, and made continuous by approximating the Heaviside function by a logistic function.  The reopening time is defined as $\tau_s$ days after $\tau_\theta$, and the maximum reopening amount $r_{max}$ happens $\tau_r$ days after that.  The time-dependence of both the sheltering phase $s(t)$ and reopening phase $r(t)$ are represented by functions with a range between 0 and 1.
+
+### Unacast
+
+```{r udata, echo=FALSE,fig.height=7,fig.width=7}
+
+udata.df <- get_udata_states(fips_table)
+ufits.df<- mobfit(udata.df,pdfname="Unacast-2020-07-21.pdf",parms0 = mobparms0)
+```
+
+
+### Google
+
+```{r google, echo=FALSE,fig.height=7,fig.width=7}
+
+fname<-file.path(datadir,paste0("google_mobility.",Sys.Date(),".csv"))
+if (!file.exists(fname)) {
+  download.file("https://www.gstatic.com/covid19/mobility/Global_Mobility_Report.csv",fname)
+}
+gdata <- read.csv(fname,as.is=TRUE)
+gdata$date <- as.Date(gdata$date)
+gdata <- subset(gdata,country_region_code=="US" &
+                  sub_region_1!="" &
+                  sub_region_2=="")
+gdata$residential_neg_percent_change_from_baseline <- 
+  -gdata$residential_percent_change_from_baseline
+names(gdata)[names(gdata)=="retail_and_recreation_percent_change_from_baseline"]<-
+  "Google_retail_and_recreation"
+names(gdata)[names(gdata)=="grocery_and_pharmacy_percent_change_from_baseline"]<-
+  "Google_grocery_and_pharmacy"
+names(gdata)[names(gdata)=="parks_percent_change_from_baseline"]<-
+  "Google_parks"
+names(gdata)[names(gdata)=="transit_stations_percent_change_from_baseline"]<-
+  "Google_transit_stations"
+names(gdata)[names(gdata)=="workplaces_percent_change_from_baseline"]<-
+  "Google_workplaces"
+names(gdata)[names(gdata)=="residential_neg_percent_change_from_baseline"]<-
+  "Google_residential_neg"
+names(gdata)[names(gdata)=="residential_percent_change_from_baseline"]<-
+  "Google_residential"
+
+row.names(fips_table)<-as.character(fips_table$Name)
+gdata$State.Abbr <- as.character(fips_table[gdata$sub_region_1,"Alpha.code"])
+gdata$numDate <- as.numeric(as.Date(gdata$date))-
+    as.numeric(as.Date(datezero))
+gdata.df <- melt(as.data.table(
+  gdata[,c("sub_region_1","State.Abbr","numDate","date",
+           "Google_retail_and_recreation",
+           #"Google_grocery_and_pharmacy",
+           #"Google_parks",
+           "Google_transit_stations",
+           "Google_workplaces",
+           "Google_residential_neg"
+           )]),id.vars=1:4)
+gdata.df$value <- (gdata.df$value+100)/100
+
+# ggplot(gdata.df)+geom_line(aes(x=numDate,y=value,color=variable))+facet_wrap(~State.Abbr,scales="free")+theme(legend.position = "bottom")
+gfits.df<-mobfit(gdata.df,pdfname="GoogleMobility-2020-07-21.pdf",parms0 = mobparms0)
+```
+
+### OpenTable
+
+If missing, substitute US country-wide value.
+
+```{r opentable, echo=FALSE,fig.height=7,fig.width=7}
+
+fname<-file.path(datadir,paste0("YoY_Seated_Diner_Data.",Sys.Date(),".csv"))
+n<-1
+while (!file.exists(fname)) {
+  fname<-file.path(datadir,paste0("YoY_Seated_Diner_Data.",Sys.Date()-n,".csv"))
+  n<-n+1
+}
+odata<-read.csv(fname,as.is=TRUE)
+odata<-subset(odata,Type=="state" | Name=="United States")
+names(odata)<-gsub("X","2020-",names(odata))
+names(odata)<-gsub("\\.","-",names(odata))
+odata.df <- melt(as.data.table(odata),id.vars=1:2,stringsAsFactors=FALSE)
+odata.df$variable<-as.Date(odata.df$variable)
+names(odata.df)[names(odata.df)=="variable"]<-"date"
+odata.df$numDate <- as.numeric(as.Date(odata.df$date))-
+    as.numeric(as.Date(datezero))
+rownames(fips_table)<-fips_table$Name
+odata.df$numFIPS <- fips_table[as.character(odata.df$Name),"numFIPS"]
+odata.df <- subset(odata.df,!is.na(numFIPS))
+odata.df <- subset(odata.df,numFIPS <=56)
+
+
+odata.df$State.Abbr <- fips_table[as.character(odata.df$Name),"Alpha.code"]
+odata.df$value <- (odata.df$value+100)/100
+odata.df$variable <- "OpenTable Bookings"
+
+odata.us <- subset(odata.df,Name=="United States")
+odata.df <- subset(odata.df,Name!="United States")
+for (j in 2:nrow(fips_table)) {
+  if (!(fips_table[j,"Name"] %in% odata.df$Name)) {
+    odata.tmp <- odata.us
+    odata.tmp$Type <- "state"
+    odata.tmp$Name <- fips_table[j,"Name"]
+    odata.tmp$numFIPS <- fips_table[j,"numFIPS"]
+    odata.tmp$State.Abbr <- as.character(fips_table[j,"Alpha.code"])
+    odata.df <- rbind(odata.df,odata.tmp)
+  } 
+}
+# ggplot(odata.df)+geom_line(aes(x=numDate,y=value,color=variable))+facet_wrap(~State.Abbr,scales="free")+theme(legend.position = "bottom")
+
+ofits.df<-mobfit(odata.df,pdfname="OpenTable-2020-07-21.pdf",minmaxinit = TRUE,parms0 = mobparms0)
+```
+
+
+
+## Summary by state
+
+```{r by state}
+vars <- c("date","State.Abbr","numDate","variable","value","fit",
+              "ys","thetamin","tautheta","ntheta",
+                                 "taus","taur","rmax")
+allfits.df <- rbind(
+  ufits.df[,..vars],
+  gfits.df[,..vars],
+  ofits.df[,..vars]
+)
+allfits.df$normfit <- allfits.df$fit/allfits.df$ys
+allfits.df$scalefit <- (allfits.df$fit/allfits.df$ys - allfits.df$thetamin)/(1-allfits.df$thetamin)
+allfits.df$treopen <- 60+allfits.df$tautheta+allfits.df$taus
+names(allfits.df)[names(allfits.df)=="variable"]<-"MobilityMetric"
+allfits.df$AbbrMobMet<-abbreviate(gsub("_","",
+                                             allfits.df$MobilityMetric),
+                                        minlength=10)
+write.csv(allfits.df,file="MobilityFits-2020-07-21.csv",row.names=FALSE)
+
+allfitstmp.df<-allfits.df
+allfitstmp.df$ys <- log10(allfitstmp.df$ys)
+names(allfitstmp.df)[names(allfitstmp.df)=="ys"]<-"log10ys"
+fitparms.df <- melt(as.data.table(
+  allfitstmp.df[,c("date","State.Abbr","MobilityMetric","AbbrMobMet",
+                "log10ys","thetamin","tautheta","ntheta",
+                                 "taus","taur","rmax","treopen")]),
+  id.vars=1:4)
+fitparms.df <- subset(fitparms.df,date==as.Date(fit0datemax,origin=datezero))
+write.csv(fitparms.df,file="MobilityParms-2020-07-21.csv",row.names=FALSE)
+
+pdf("Mobility-2020-07-21.pdf",height=8.5,width=11)
+for (statenow in unique(as.character(allfits.df$State.Abbr))) {
+  p<-ggplot(subset(allfits.df,State.Abbr==statenow))+
+           geom_point(aes(x=date,y=value))+
+             geom_line(aes(x=date,y=fit),color="red",
+                       data=subset(allfits.df,State.Abbr==statenow))+
+             geom_vline(aes(xintercept=value,linetype=ReopenType,
+                            color=ReopenType),
+                        data=subset(reopendat.df,State.Abbr==statenow))+
+      geom_point(aes(x=as.Date(treopen,origin=datezero),
+                   y=fit),color="red",
+               data=subset(allfits.df[allfits.df$numDate==
+                                      round(allfits.df$treopen),],
+                           State.Abbr==statenow))+
+             facet_wrap(~MobilityMetric,scales="free")+
+             theme(legend.position = "bottom")
+  print(p+ggtitle(statenow))
+  pp <- ggplot(subset(fitparms.df,State.Abbr==statenow))+
+    geom_boxplot(aes(y=value),outlier.color="grey")+
+    geom_point(aes(x=AbbrMobMet,y=value))+
+    facet_wrap(~variable,scales="free")+coord_flip()
+  print(pp)
+}
+dev.off()
+
+pdf("MobilityFitNorm-2020-07-21.pdf",height=6,width=9)
+for (statenow in unique(as.character(allfits.df$State.Abbr))) {
+  p<-ggplot(subset(allfits.df,State.Abbr==statenow))+
+             geom_line(aes(x=date,y=normfit,color=MobilityMetric,
+                           linetype=MobilityMetric),
+                       data=subset(allfits.df,State.Abbr==statenow))+
+      geom_point(aes(x=as.Date(treopen,origin=datezero),
+                   y=normfit),color="red",
+               data=subset(allfits.df[allfits.df$numDate==
+                                      round(allfits.df$treopen),],
+                           State.Abbr==statenow))+
+             theme(legend.position = "bottom")
+  print(p+ggtitle(statenow))
+}
+dev.off()
+
+pdf("MobilityFitScale-2020-07-21.pdf",height=6,width=9)
+for (statenow in unique(as.character(allfits.df$State.Abbr))) {
+  p<-ggplot(subset(allfits.df,State.Abbr==statenow))+
+             geom_line(aes(x=date,y=scalefit,color=MobilityMetric,
+                           linetype=MobilityMetric),
+                       data=subset(allfits.df,State.Abbr==statenow))+
+      geom_point(aes(x=as.Date(treopen,origin=datezero),
+                   y=scalefit),color="red",
+               data=subset(allfits.df[allfits.df$numDate==
+                                      round(allfits.df$treopen),],
+                           State.Abbr==statenow))+
+             theme(legend.position = "bottom")
+  print(p+ggtitle(statenow))
+}
+dev.off()
+```
+
+## Discussion
+
+The Weibull+linear parameterization gives an adequate fit to the time-dependence for all the mobility data sources investigated.  Although clearly the linear increase cannot continue indefinitely, at least through the beginning of June, it is fairly representative.
+
+Of note is that for all mobility data sources except for restaurant reservations, the linear increase began *prior* to the first re-opening milestone.  Therefore, it is not necessarily reliable to rely upon announced re-opening dates to represent when changes in transmission rates may occur.
+
+```{r distributions of parameters}
+
+fitm<-as.data.frame(aggregate(value~variable*State.Abbr,data=fitparms.df,mean))
+names(fitm)<-c("variable","State.Abbr","value.mean")
+fitsd<-as.data.frame(aggregate(value~variable*State.Abbr,data=fitparms.df,sd))
+names(fitsd)<-c("variable","State.Abbr","value.sd")
+fitq<-aggregate(value~variable*State.Abbr,data=fitparms.df,quantile,
+          prob=c(0,0.025,0.25,0.5,0.75,0.975,1),simplify=TRUE)
+fitsum<-cbind(fitm,fitsd,fitq)
+fitsum<-fitsum[,-c(4:5,7:8)]
+print(fitsum)
+write.csv(fitsum,file="MobilityParmsSummaryByState-2020-07-21.csv",row.names=FALSE)
+```
+
+```{r example figure}
+allfits.df<-fread("MobilityFits-2020-07-21.csv")
+ys0 <- median(allfits.df$ys)
+thetamin0 <- median(allfits.df$thetamin)
+tautheta0 <- median(allfits.df$tautheta)
+ntheta0 <- median(allfits.df$ntheta)
+taus0 <- median(allfits.df$taus)
+taur0 <- median(allfits.df$taur)
+rmax0 <- median(allfits.df$rmax)
+treopen0 <- 60+tautheta0+taus0
+treopen1 <- treopen0 + taur0
+
+exfit.df <- data.frame(numDate=60:max(allfits.df$numDate))
+exfit.df$date <- as.Date(exfit.df$numDate,origin=datezero)
+exfit.df$y <- func(exfit.df$numDate,1,thetamin0,tautheta0,ntheta0,
+                                 taus0,taur0,rmax0)
+extau.df <- data.frame(numDate=60+c(tautheta0,
+                             tautheta0+taus0,
+                             tautheta0+taus0+taur0),
+                       Milestone=factor(c("Shelter","ReopenStart","ReopenMax"),
+                                        levels=c("Shelter","ReopenStart","ReopenMax"))
+                       )
+extau.df$date <- as.Date(extau.df$numDate,origin=datezero)
+extau.df$y<- func(extau.df$numDate,1,thetamin0,tautheta0,ntheta0,
+                                 taus0,taur0,rmax0)
+
+extaulab.df <- data.frame(numDate=60+c(tautheta0/2,
+                             tautheta0+taus0/2,
+                             tautheta0+taus0+taur0/2),
+                          numDate0=c(60,60+tautheta0,60+tautheta0+taus0),
+                          numDate1=c(60+tautheta0,60+tautheta0+taus0,60+tautheta0+taus0+taur0),
+                       Milestone=factor(c("Shelter","ReopenStart","ReopenMax"),
+                                        levels=c("Shelter","ReopenStart","ReopenMax"))
+                       )
+extaulab.df$date <- as.Date(extaulab.df$numDate,origin=datezero)
+extaulab.df$date0 <- as.Date(extaulab.df$numDate0,origin=datezero)
+extaulab.df$date1 <- as.Date(extaulab.df$numDate1,origin=datezero)
+extaulab.df$y <- 0.2
+
+pex<-ggplot(exfit.df)+
+  geom_line(aes(x=date,y=y),size=2,color="grey")+
+  geom_point(data=extau.df,aes(x=date,y=y,color=Milestone))+
+  geom_segment(data=extaulab.df,aes(x=date0,xend=date1,y=y,yend=y),arrow=arrow(ends="both",length=unit(0.1,"inches")))+
+  geom_label(data=extaulab.df[1,],aes(x=date,y=0,
+                                   label=deparse(bquote(tau[theta]))),
+             parse=TRUE,
+             hjust=0.5,vjust=-0.2)+
+    geom_label(data=extaulab.df[2,],aes(x=date,y=0,
+                                     label=deparse(bquote(tau[s]))),
+             parse=TRUE,
+             hjust=0.5,vjust=-0.2)+
+    geom_label(data=extaulab.df[3,],aes(x=date,y=0,
+                                     label=deparse(bquote(tau[r]))),
+             parse=TRUE,
+             hjust=0.5,vjust=-0.2)+
+  geom_segment(data=extau.df,aes(x=date,xend=date,y=y,yend=0,
+                                 color=Milestone),linetype="dashed")+
+  geom_segment(data=extau.df[-1,],
+               aes(x=as.Date(60,origin=datezero),
+                   xend=date,y=y,yend=y,color=Milestone),
+               linetype="dashed")+
+  geom_label(data=extau.df[2,],aes(x=date,y=y),
+             label=deparse(bquote(theta[min])), 
+             parse = TRUE,hjust=1.1,vjust=-0.1)+
+  geom_label(data=extau.df[3,],aes(x=date,y=y),label=
+               deparse(bquote(theta[min]+r[max](1-theta[min]))),
+             parse=TRUE,hjust=0.5,vjust=-0.1)+
+  scale_x_date(date_minor_breaks="1 day",expand = c(0, 0))+
+  scale_y_continuous(expand = c(0, 0),limits=c(0,1))+
+  theme_bw()+theme(legend.position="none")+
+  xlab("Date")+ylab("Mobility Metric")+
+  scale_color_viridis_d(option="magma",end=0.6)
+
+ggsave("MobilityFitExample-2020-07-21.pdf",pex,height=4,width=6,scale=0.5)
+```
+
+```{r reopen dates}
+
+fitreopen.df<-rbind(fitparms.df,
+                    data.frame(date=reopendat.df$value,
+                               State.Abbr=reopendat.df$State.Abbr,
+                               MobilityMetric=reopendat.df$ReopenType,
+                               AbbrMobMet=abbreviate(reopendat.df$ReopenType,
+                                        minlength=10),
+                               variable="ReopenDates",
+                               value=reopendat.df$numDate))
+fitreopen.df<-subset(fitreopen.df,!is.na(value))
+
+```
