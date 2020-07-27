@@ -2,12 +2,15 @@ functiondir <- "functions"
 figuredir <- "Figures"
 modeldir <- "model"
 datezero <- "2019-12-31"
-datadatemax <- "2020-06-20"
+folder<-"SEIR.reopen.state.2020.07.22"
+datadatemax <- "2020-07-22"
+datemaxplot <- "2020-09-30"
+scenstartdate <- "2020-08-01"
+rampuptime<-14
 source(file.path(functiondir,"get_testdata_functions.R"))
 source(file.path(functiondir,"scenarios_functions.R"))
 
 
-folder<-"SEIR.reopen.state.2020.06.20"
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
 ))
@@ -21,18 +24,6 @@ source(here::here(mdir,"setup_MCSim.R"))
 makemod(here::here(mdir)) 
 model_file<- "SEIR.scenarios.model.R"
 exe_file<-makemcsim(model_file,modeldir=modeldir)
-for (statenow in statesvec) {
-  output <- run_setpoints1(fips_table,
-                           state_abbr=statenow,
-                           TPrint=datadatemax,
-                           pathdir=folder,
-                           scenariostemplate=
-                             "SEIR.reopen_state_setpoints1_MCMC.in.R",
-                           scenarioname = "OneTime",
-                           nruns = 0,
-                           keepoutfile = TRUE,
-                           exe_file = exe_file)
-}
 
 scen.df <- data.frame(state=sort(rep(statesvec,12)),
                       mu_C = rep(rep(c(1,1,2,2),3),length(statesvec)),
@@ -51,7 +42,7 @@ scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
                                       ifelse(sign(scen.df$DeltaDelta)==0,
                                       "Current",""
                                       )))," Reopening")
-pdf(file=file.path(figuredir,"FigS10_Scenarios_Results_2020-06-20.pdf"),height=4,width=6)
+pdf(file=file.path(figuredir,paste0("FigS10_Scenarios_Results_",datadatemax,".pdf")),height=4,width=6)
 for (j in 1:nrow(scen.df)) {
   scenrow<-scen.df[j,]
   output <- run_setpoints(fips_table,
@@ -64,11 +55,15 @@ for (j in 1:nrow(scen.df)) {
                           mu_C = scenrow$mu_C,
                           mu_Lambda = scenrow$mu_Lambda,
                            DeltaDelta = scenrow$DeltaDelta,
-                          rampuptime=14,
+                          scenstartdate = scenstartdate,
+                          TPrint=datemaxplot,
+                          rampuptime=rampuptime,
                            keepoutfile = FALSE,
                           exe_file = exe_file)
   plot_scenario(alldat.df, output$out_quant,scenrow$state,
                 logy=FALSE,
+                datadatemax=datadatemax,
+                datemaxplot=datemaxplot,
                 scenarioname = scenrow$scenariodesc)
 }
 dev.off()

@@ -89,6 +89,11 @@ calibdate <- "2020-07-22"
 novalid <- FALSE
 validdate <- "2020-07-22"
 
+# folder <- "SEIR.reopen.state.2020.06.20"
+# calibdate <- "2020-06-20"
+# novalid <- TRUE
+# validdate <- "2020-06-20"
+
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
 ))
@@ -619,6 +624,52 @@ for (j in 1:length(csvfiles)) {
 }
 dev.off()
 
+## Estimated time-dependent compartments
+pdf(file=file.path(folder,"TimeDep_Compartments.pdf"),height=4,width=6)
+for (j in 1:length(csvfiles)) {
+  preddat <- preddat.list[[j]]
+  preddat$Date <- as.Date(preddat$Time,origin=as.Date(datezero))
+  statenow<-str_split(csvfiles[[j]],"_")[[1]][2]
+  statedat <- subset(dat.df,state==statenow)
+  reopennow <- subset(reopen.df,State.Abbr==statenow)
+  reopennow$Date <- as.Date(reopennow$numDate,origin=as.Date(datezero))
+  if (calibdate!="") {
+    datadatemax <- calibdate    
+  } else {
+    datadatemax <- as.character(min(reopennow$value,
+                                    na.rm=TRUE))
+  }
+  reopennow <- subset(reopennow,Date < as.Date(datadatemax))
+  tmpdat<-subset(preddat,(Output_Var=="ThetaFit" | Output_Var=="beta" |
+                            Output_Var=="c" | Output_Var=="lambda") & 
+                   Date <= max(statedat$Date) &
+                   Date >= min(statedat$Date))
+  tmpdat$Output_Var<-factor(tmpdat$Output_Var)
+  p<-ggplot(tmpdat)+
+    geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,fill="CrI"))+
+    geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,fill="IQR"))+
+    geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
+    labs(fill="",linetype="Estimated")+
+    guides(linetype = guide_legend(order = 1),
+           fill = guide_legend(order = 2))+
+    ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+    scale_x_date(date_minor_breaks = "1 day") + 
+    facet_wrap(~Output_Var,scales = "free_y")+
+    ggtitle(paste(statenow,"Theta, Beta, c, lambda Estimated"))
+  if (nrow(reopennow)>0) {
+    p <- p + geom_point(aes(x=Date,y=min(tmpdat$Prediction.2.5.),
+                            shape=ReopenType),data=reopennow)
+  }
+  if (datadatemax < max(preddat$Date)) {
+    print(p + geom_vline(xintercept=as.Date(datadatemax),
+                         color="grey",linetype="dotted"))
+  } else {
+    print(p)
+  }
+}
+dev.off()
+
+
 ## Estimated I compartments
 pdf(file=file.path(folder,"I_Compartments.pdf"),height=4,width=6)
 for (j in 1:length(csvfiles)) {
@@ -636,11 +687,12 @@ for (j in 1:length(csvfiles)) {
   }
   reopennow <- subset(reopennow,Date < as.Date(datadatemax))
   tmpdat<-subset(preddat,(Output_Var=="I_U" | Output_Var=="I_C" |
-                            Output_Var=="I_T" ) & 
+                            Output_Var=="I_T" | Output_Var=="A_U" | 
+                            Output_Var=="A_C") & 
                    Date <= max(statedat$Date) &
                    Date >= min(statedat$Date))
   tmpdat$Output_Var<-factor(tmpdat$Output_Var,
-                            levels=c("I_U","I_C","I_T"))
+                            levels=c("I_U","I_C","I_T","A_U","A_C"))
   p<-ggplot(tmpdat)+
     geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,fill="CrI"))+
     geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,fill="IQR"))+
@@ -650,8 +702,8 @@ for (j in 1:length(csvfiles)) {
            fill = guide_legend(order = 2))+
     ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
     scale_x_date(date_minor_breaks = "1 day") + 
-    facet_wrap(~Output_Var)+
-    ggtitle(paste(statenow,"I(t) Estimated"))
+    facet_wrap(~Output_Var,scales = "free_y")+
+    ggtitle(paste(statenow,"I(t), A(t) Estimated"))
   if (nrow(reopennow)>0) {
     p <- p + geom_point(aes(x=Date,y=min(tmpdat$Prediction.2.5.),
                                 shape=ReopenType),data=reopennow)
@@ -685,11 +737,11 @@ for (j in 1:length(csvfiles)) {
   tmpdat<-subset(preddat,(Output_Var=="S" | 
                             Output_Var=="S_C" | 
                             Output_Var=="E" | 
-                            Output_Var=="E_C") & 
+                            Output_Var=="E_C" | Output_Var=="CumInfected") & 
                    Date <= max(statedat$Date) &
                    Date >= min(statedat$Date))
   tmpdat$Output_Var<-factor(tmpdat$Output_Var,
-                            levels=c("S","S_C","E","E_C"))
+                            levels=c("S","S_C","E","E_C","CumInfected"))
   p<-ggplot(tmpdat)+
     geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,fill="CrI"))+
     geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,fill="IQR"))+
@@ -699,9 +751,9 @@ for (j in 1:length(csvfiles)) {
            fill = guide_legend(order = 2))+
     ylab("")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
     scale_x_date(date_minor_breaks = "1 day") + 
-    scale_y_log10() +
-    annotation_logticks(sides="l")+
-    facet_wrap(~Output_Var)+
+    # scale_y_log10() +
+    # annotation_logticks(sides="l")+
+    facet_wrap(~Output_Var,scales = "free_y")+
     ggtitle(paste(statenow,"S(t), E(t) Estimated"))
   if (nrow(reopennow) > 0) {
     p <- p +     geom_point(aes(x=Date,y=min(tmpdat$Prediction.2.5.),

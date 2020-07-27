@@ -3,7 +3,7 @@
 
    Model File:  model/SEIR.scenarios.model.R
 
-   Date:  Sun Jul 26 12:34:56 2020
+   Date:  Mon Jul 27 13:27:20 2020
 
    Created by:  "MCSim/mod.exe v6.1.0"
     -- a model preprocessor by Don Maszle
@@ -101,8 +101,8 @@
      GM_TLatent = 4;
      GM_TRecover = 10;
      GM_IFR = 0.01;
-     GM_T50Testing = 120;
-     GM_TauTesting = 21;
+     GM_T50Testing = 83;
+     GM_TauTesting = 7;
      GM_TTestingRate = 7;
      GM_TContactsTestingRate = 2;
      GM_FAsymp = 0.295;
@@ -756,8 +756,8 @@ void InitModel(void)
   GM_TLatent = 4;
   GM_TRecover = 10;
   GM_IFR = 0.01;
-  GM_T50Testing = 120;
-  GM_TauTesting = 21;
+  GM_T50Testing = 83;
+  GM_TauTesting = 7;
   GM_TTestingRate = 7;
   GM_TContactsTestingRate = 2;
   GM_FAsymp = 0.295;

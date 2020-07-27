@@ -31,7 +31,7 @@ scen.df <- data.frame(state=statesvec,
 scen.df$scenarioname <- "Validation"
 scen.df$scenariodesc <- "Validation"
 scennew.df<-data.frame()
-pdf(file=file.path(figuredir,"FigS4_SecondValidationResults.pdf"),height=6,width=8)
+pdf(file=file.path(figuredir,"FigS2_Validation.2.Results.pdf"),height=6,width=8)
 for (j in 1:nrow(scen.df)) {
   scenrow<-scen.df[j,]
   dat.df <- subset(alldat.df,state==scenrow$state)
@@ -125,4 +125,4 @@ for (j in 1:nrow(scen.df)) {
   scennew.df<-rbind(scennew.df,scenrow)
 }
 dev.off()
-write.csv(scennew.df,file.path(figuredir,"FigS4_SecondValidationCoverage.csv"))
+write.csv(scennew.df,file.path(figuredir,"FigS2_Validation.2.Coverage.csv"))

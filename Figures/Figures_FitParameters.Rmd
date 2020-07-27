@@ -1,5 +1,5 @@
 ---
-title: "Prediction Figures"
+title: "Prior/posterior Figures"
 author: "Weihsueh Chiu"
 date: "`r format(Sys.time(), '%F')`"
 output:

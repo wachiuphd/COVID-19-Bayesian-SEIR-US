@@ -118,8 +118,36 @@ print(pReffMin)
 # ggsave("Refft.Min.pdf",plot=pReffMin,height=3,width=6,scale=1.75)
 # ggsave("Refft.Min.jpeg",plot=pReffMin,height=3,width=6,scale=1.75)
 ```
+```{r Rt prediction date, echo=FALSE,fig.height=3,fig.width=10}
+preddat.Rt.df <- subset(allpreddat,Output_Var=="Rt")
+preddat.Rt.df <- preddat.Rt.df[preddat.Rt.df$Date==as.Date(preddate),]
+preddat.Rt.df$Category <- "R(t) ~ 1"
+preddat.Rt.df$Category[preddat.Rt.df$Prediction.75.<1] <- "R(t) < 1"
+preddat.Rt.df$Category[preddat.Rt.df$Prediction.25.>1] <- "R(t) > 1"
+preddat.Rt.df$Category<-factor(preddat.Rt.df$Category,
+                            levels=
+                              c("R(t) < 1","R(t) ~ 1","R(t) > 1"))
+rownames(preddat.Rt.df)<- preddat.Rt.df$state
+pRnow <- ggplot(preddat.Rt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity")+
+    scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R(t)<1),
+                                   bquote(R(t)%~~%1),
+                                   bquote(R(t)>1)))+
+  xlab("")+
+  ylim(0,2.5)+ylab(bquote(R(t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R(t)," on ",.(preddate))))
+print(pRnow)
+```
 
-```{r Refft prediction date, echo=FALSE,fig.height=3,fig.width=6}
+```{r Refft prediction date, echo=FALSE,fig.height=3,fig.width=10}
 preddat.df <- subset(allpreddat,Output_Var=="Refft")
 preddat.df <- preddat.df[preddat.df$Date==as.Date(preddate),]
 preddat.df$Category <- "R[eff](t) ~ 1"
@@ -150,7 +178,8 @@ print(pReffnow)
 fips_table$RtCategory <- preddat.df[fips_table$Alpha.code,"Category"]
 ```
 
-```{r combined with min, echo=FALSE,fig.height=3,fig.width=6}
+```{r combined with min, echo=FALSE,fig.height=3,fig.width=10}
+preddat.minRt.df$monthday<-gsub("2020-","",as.character(preddat.minRt.df$Date))
 pReffcombmin <- ggplot()+
   geom_boxplot(aes(x=state,middle=Prediction.50.,
                    lower=Prediction.25.,upper=Prediction.75.,
@@ -169,9 +198,9 @@ pReffcombmin <- ggplot()+
     xlab("")+
   ylim(0,2.5)+ylab(bquote(R[eff](t)))+
   geom_hline(yintercept=1,size=2,alpha=0.6)+
-  geom_text(aes(x=state,y=0,label=Date,angle=90),
-            data=preddat.minRt.df,color="grey40",
-            hjust=0.25,size=2)+
+  geom_text(aes(x=state,y=0,label=monthday,angle=90),
+            data=preddat.minRt.df,#color="grey40",
+            hjust=0.25,size=3)+
   labs(fill="Category based on IQR")+
   theme_bw()+theme(legend.position="none")+
   ggtitle(bquote(paste(R[eff](t)," at min and on ",.(preddate))))
@@ -181,6 +210,37 @@ print(pReffcombmin)
 
 ```
 
+```{r combined with Rt, echo=FALSE,fig.height=3,fig.width=10}
+ReffRt <- data.table(state=preddat.df$state,Reff_R=preddat.df$Prediction.50./preddat.Rt.df$Prediction.50.)
+pReffRt50 <- ggplot(ReffRt)+geom_col(aes(x=state,y=Reff_R))+ylab("Median Reff/Median Rt")
+print(pReffRt50)
+
+pReffcombRt <- ggplot()+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),alpha=0.5,color="grey60",
+               stat="identity",data=preddat.Rt.df)+
+  geom_boxplot(aes(x=state,middle=Prediction.50.,
+                   lower=Prediction.25.,upper=Prediction.75.,
+                   ymin=Prediction.2.5.,ymax=Prediction.97.5.,
+                   fill=Category),
+               stat="identity",data=preddat.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)),drop=FALSE)+
+    xlab("")+
+  ylim(0,2.5)+ylab(bquote(R[eff](t)))+
+  geom_hline(yintercept=1,size=2,alpha=0.6)+
+  labs(fill="Category based on IQR")+
+  theme_bw()+theme(legend.position="none")+
+  ggtitle(bquote(paste(R[eff](t)," and ",R(t)," on ",.(preddate))))
+print(pReffcombRt)
+# ggsave("Refft.comb.Rt.pdf",plot=pReffcombmin,height=3,width=6,scale=1.75)
+# ggsave("Refft.comb.Rt.jpeg",plot=pReffcombmin,height=3,width=6,scale=1.75)
+
+```
 
 ```{r load parameters, echo=FALSE}
 ## Load parameters
@@ -286,7 +346,7 @@ allparms.med$Category <- fips_table[as.character(allparms.med$state),"RtCategory
 
 ```
 
-```{r transmission rebound, echo=FALSE,fig.height=6,fig.width=6}
+```{r transmission rebound, echo=FALSE,fig.height=6,fig.width=10}
 prebound <- ggplot(allparms)+
   geom_col(aes(x=state,y=100*Delta,fill=Category),data=allparms.med)+
   geom_boxplot(aes(x=state,y=100*Delta),alpha=0,outlier.shape = NA)+
@@ -309,7 +369,148 @@ print(figReffRebound)
 ggsave("Fig2_ReffRebound.pdf",plot=figReffRebound,height=4,width=6,scale=1.75)
 ggsave("Fig2_ReffRebound.jpeg",plot=figReffRebound,height=4,width=6,scale=1.75)
 ```
+```{r load results}
+folder <- "../SEIR.reopen.state.2020.07.22"
+numDate <- as.numeric(as.Date("2020-07-22"))-as.numeric(as.Date(datezero))
+t <- numDate
+if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData") else {
+  scenparms <- data.frame()
+  for (statenow in statesarr) { 
+    sampfile <- list.files(path=file.path(folder,statenow),
+                             pattern="*OneTime.out",
+                           full.names=TRUE)
+    parms <- read.delim(sampfile,as.is=TRUE,sep="\t")
+    names(parms)<-gsub("_1.1","",names(parms))
+    names(parms)<-gsub("GM_","",names(parms))
+    parms$state <- factor(statenow,levels=(sort(statesarr)))
+    
+    ## Time dependent parameters, evaluated at last day
+    parms$ThetaFit <- (parms$ThetaMin - 
+                          (parms$ThetaMin - 1)*
+                          exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+    ## Reopening - increase contacts/day
+    parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+    parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+    parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+    parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+    ## Contacts/day
+    parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+    ## Hygiene - reduce infection probability/infected contact
+    parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+    parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+    parms$Delta <- (parms$c*parms$beta -
+                              parms$c0*parms$beta0*
+                              parms$ThetaMin^(1+parms$HygienePwr))/
+    (parms$c0*parms$beta0 -
+       parms$c0*parms$beta0*
+       parms$ThetaMin^(1+parms$HygienePwr))
+    ## Time dependence of testing/contact tracting
+    parms$TestingTimeDep <- (1-1/(1+exp((t-parms$T50Testing)/parms$TauTesting))); 
+    ## Contact tracing
+    parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+    ## Testing
+    parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+    parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+    parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+    parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+    ## Case fatality
+    parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+    parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+    parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+    scenparms <- rbind(scenparms,parms)
+  }
+  scenparms<-scenparms[,!duplicated(names(scenparms))]
+  scenparms.med<-aggregate(.~state,data=scenparms,median)
+}
 
+```
+
+```{r contributions to Refft,echo=FALSE,fig.height=6,fig.width=6}
+
+res<-lm(Refft~.,data=scenparms[,c("R0","HygienePwr","ThetaMin",
+                                  "rMax","FracTraced","FAsymp","lambda","rho","Refft")])
+
+print(summary(res))
+print(anova(res))
+
+phyg<-ggplot(scenparms,aes(x=Refft,y=HygieneFit,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta^eta))+
+  theme(legend.position="none")
+
+phygpwr<-ggplot(scenparms,aes(x=Refft,y=HygienePwr,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(eta))+
+  theme(legend.position="none")
+
+ptheta<-ggplot(scenparms,aes(x=Refft,y=ThetaMin,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(theta[min]))+
+  theme(legend.position="none")
+
+pDelta<-ggplot(scenparms,aes(x=Refft,y=Delta,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(Delta))+
+  theme(legend.position="none")
+
+preopen<-ggplot(scenparms,aes(x=Refft,y=rMax,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(r[max]))+
+  theme(legend.position="none")
+
+pfc<-ggplot(scenparms,aes(x=Refft,y=FracTraced,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(f[C]))+
+  theme(legend.position="none")
+
+ptesting<-ggplot(scenparms,aes(x=Refft,y=lambda,color=state))+
+  geom_point(alpha=0.3)+
+  stat_ellipse()+
+  geom_label(aes(label=state),data=scenparms.med, label.size = 0.1)+
+  scale_color_viridis_d(option="magma",end=0.8)+xlim(0,2)+
+  geom_vline(xintercept=1)+
+  xlab(bquote(R[eff](t)))+
+  ylab(bquote(lambda))+
+  theme(legend.position="none")
+
+FigS8<-ggarrange(ptheta,phygpwr,
+                 preopen,pfc,
+                 nrow=2,ncol=2,labels = c("A", "B","C","D"))
+print(FigS8)
+ 
+ggsave("FigS8_corr.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corr.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+```
 
 ```{r contributions to Rt,echo=FALSE,fig.height=8,fig.width=8}
 
@@ -324,7 +525,7 @@ phyg<-ggplot(allparms,aes(x=Rt,y=HygieneFit,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(theta^eta))+
   theme(legend.position="none")
 
@@ -334,7 +535,7 @@ phygpwr<-ggplot(allparms,aes(x=Rt,y=HygienePwr,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(eta))+
   theme(legend.position="none")
 
@@ -344,7 +545,7 @@ ptheta<-ggplot(allparms,aes(x=Rt,y=ThetaMin,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(theta[min]))+
   theme(legend.position="none")
 
@@ -354,7 +555,7 @@ pDelta<-ggplot(allparms,aes(x=Rt,y=Delta,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(Delta))+
   theme(legend.position="none")
 
@@ -364,7 +565,7 @@ preopen<-ggplot(allparms,aes(x=Rt,y=rMax,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(r[max]))+
   theme(legend.position="none")
 
@@ -374,7 +575,7 @@ pfc<-ggplot(allparms,aes(x=Rt,y=FracTraced,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(f[C]))+
   theme(legend.position="none")
 
@@ -384,7 +585,7 @@ ptesting<-ggplot(allparms,aes(x=Rt,y=lambda,color=state))+
   geom_label(aes(label=state),data=allparms.med, label.size = 0.1)+
   scale_color_viridis_d(option="magma",end=0.8)+xlim(0,3)+
   geom_vline(xintercept=1)+
-  xlab(bquote(R[eff](t)))+
+  xlab(bquote(R(t)))+
   ylab(bquote(lambda))+
   theme(legend.position="none")
 
@@ -393,6 +594,135 @@ FigS8<-ggarrange(preopen,pfc,
                  nrow=2,ncol=2,labels = c("A", "B","C","D"))
 print(FigS8)
  
-ggsave("FigS8_corr.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
-ggsave("FigS8_corr.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corrRt.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("FigS8_corrRt.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+```
+
+```{r Delta crit,echo=FALSE,fig.height=3,fig.width=6}
+if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData")
+scenparms<-scenparms[,!duplicated(names(scenparms))]
+  
+Deltacritfunc<-function(scenparms,fscale=1,lscale=1) {
+  ftracescaled<-scenparms$FTraced*fscale
+  ftracescaled[ftracescaled>0.99]<-0.99
+  Deltacrit<-((1/((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda*lscale)+
+                    scenparms$FAsymp/scenparms$rho))/
+             (scenparms$S*scenparms$c0*scenparms$beta0*
+                (1-ftracescaled)) - 
+            scenparms$ThetaMin^(1+scenparms$HygienePwr))/
+    (1 - scenparms$ThetaMin^(1+scenparms$HygienePwr))
+  Deltacrit[Deltacrit>1]<-1
+  return(Deltacrit)
+}
+scenparms$Deltacrit.1.1 <- Deltacritfunc(scenparms,fscale=1,lscale=1)
+scenparms$Deltacrit.1.2 <- Deltacritfunc(scenparms,fscale=1,lscale=2)
+scenparms$Deltacrit.2.1 <- Deltacritfunc(scenparms,fscale=2,lscale=1)
+scenparms$Deltacrit.2.2 <- Deltacritfunc(scenparms,fscale=2,lscale=2)
+
+scenparms.med<-aggregate(.~state,data=scenparms,median)
+scenparms$Category <- fips_table[as.character(scenparms$state),"RtCategory"]
+scenparms.med$Category <- fips_table[as.character(scenparms.med$state),"RtCategory"]
+
+dftmp<-melt(as.data.table(scenparms),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp$variable[dftmp$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp$variable[dftmp$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dftmp.med<-melt(as.data.table(scenparms.med),id.vars=c("state","Category","Delta"),
+            measure.vars = c("Deltacrit.1.1",
+                             "Deltacrit.1.2","Deltacrit.2.1","Deltacrit.2.2"),
+            variable.factor = FALSE)
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.1"]<-"Delta[crit](1,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
+dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
+
+dflabs<-c("Baseline","2X testing",
+                          "2X contact tracing","2X testing and contact tracing")
+names(dflabs)<-c("Delta[crit](1,1)","Delta[crit](1,2)","Delta[crit](2,1)","Delta[crit](2,2)")
+
+p<-ggplot(data=dftmp,
+       aes(x=state,
+           y=100*value,fill=Category
+           #,color=variable
+           )) + 
+  geom_boxplot(outlier.shape = NA,position="dodge")+
+  #geom_col(data=dftmp.med,position="dodge")+
+  #scale_color_viridis_d(begin=0.9,end=0.5,option="magma")+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #coord_cartesian(ylim=c(0,100))+
+  scale_y_continuous(breaks=seq(-25,100,25),limits = c(-25,100))+
+  ylab(bquote(Delta[crit]))+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom"
+        #            ,
+        #            axis.title.x=element_blank(),
+        # axis.text.x=element_blank(),
+        # axis.ticks.x=element_blank()
+        )+
+  geom_hline(yintercept=0)+
+  #ggtitle(bquote(paste(Delta[crit](mu[lambda],mu[C]),": Critical % reopening to keep ",R[eff](t)<1)))+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+p2<-p+geom_point(aes(x=state,y=100*Delta,shape="Delta(t)",fill=Category),
+                 data=dftmp.med)+
+  scale_shape_manual(values=21,
+                     labels=as.expression(bquote(Delta(t==2020-07-22))))
+print(p2)
+ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.pdf",plot=p2,height=4,width=6,scale=1.75)
+ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.jpeg",plot=p2,height=4,width=6,scale=1.75)
+```
+
+```{r safe maps,echo=FALSE,fig.height=8,fig.width=8}
+ftraceloggrid<-10^seq(-2,0,0.05)
+lambdaloggrid<-10^seq(-2,-0.3,0.05)
+if (file.exists("f_lambda_safemap-2020-07-22.RData")) load("f_lambda_safemap-2020-07-22.RData") else {
+  gg.df <- data.frame()
+  for (statenow in statesarr) {
+    parms<-subset(scenparms,state==statenow)
+    gg <- expand.grid(FTraced=ftraceloggrid,lambda=lambdaloggrid)
+    gg$PrRle1<-0
+    for (j in 1:nrow(gg)){
+      fscale <- gg$FTraced[j]/median(parms$FTraced)
+      lscale <- gg$lambda[j]/median(parms$lambda)
+      Refft <- parms$R0*parms$S*parms$rho*(1-parms$FTraced*fscale)*
+        parms$HygieneFit*parms$c/parms$c0/(parms$rho+parms$lambda*lscale)
+      gg$PrRle1[j] <- ecdf(Refft)(1)
+    }
+    gg$state<-statenow
+    gg.df<-rbind(gg.df,gg)
+  }
+}
+
+pall<-ggplot(gg.df,aes(x=FTraced,y=lambda)) +
+  geom_tile(aes(fill=PrRle1))+
+  scale_fill_viridis_c("Probability R[eff](t)<1",begin = 0.4,option="magma")+
+  scale_x_log10(expand=c(0,0.02))+
+  scale_y_log10(expand=c(0,0.02))+
+  stat_contour(aes(z=PrRle1),
+               breaks=c(0.025,0.5,0.975))+
+  geom_label_contour(aes(z=PrRle1),label.padding=unit(0.05,"lines"),
+               breaks=c(0.025,0.5,0.975),size=3,alpha=0.5)+
+  geom_point(aes(x=FTraced,y=lambda,color=""),
+             fill="white",shape=21,data=scenparms.med,size=2)+
+  scale_color_viridis_d(begin=0,end=0)+
+  labs(fill=bquote(paste("Pr ",R[eff](t)<1)), color="Current Parameters")+
+  xlab(bquote(paste(f[C]," = Fraction of Contacts Traced")))+
+  ylab(bquote(lambda == Coverage %*% Sensitivity %*% TestingRate))+
+  annotation_logticks()+
+  facet_wrap(~state)+
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
+print(pall)
+
+ggsave("FigS9_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
+ggsave("FigS9_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
+save(scenparms,scenparms.med,file="scenparms_OneTime-2020-07-22.RData")
+save(gg.df,file="f_lambda_safemap-2020-07-22.RData")
 ```
