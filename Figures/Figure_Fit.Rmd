@@ -33,8 +33,6 @@ Calibration using data through July 22.
 
 ```{r load prediction results, echo=FALSE, include=FALSE}
 
-# Separately source "run_plot_validation.2_scenario.R")
-
 folder <- "../SEIR.reopen.state.2020.07.22"
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
