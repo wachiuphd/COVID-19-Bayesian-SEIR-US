@@ -17,6 +17,7 @@ library(stringr)
 library(knitr)
 library(ggpubr)
 library(dplyr)
+library(tidyr)
 library(metR)
 library(data.table)
 library(usmap)
@@ -160,6 +161,7 @@ fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
 ))
 rownames(fips_table) <- fips_table$Alpha.code
+statesarr <- fips_table$Alpha.code[2:52]
 
 # New facet label names 
 DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
