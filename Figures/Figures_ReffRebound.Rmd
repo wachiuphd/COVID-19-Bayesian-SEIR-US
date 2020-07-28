@@ -605,10 +605,12 @@ scenparms<-scenparms[,!duplicated(names(scenparms))]
 Deltacritfunc<-function(scenparms,fscale=1,lscale=1) {
   ftracescaled<-scenparms$FTraced*fscale
   ftracescaled[ftracescaled>0.99]<-0.99
-  Deltacrit<-((1/((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda*lscale)+
-                    scenparms$FAsymp/scenparms$rho))/
-             (scenparms$S*scenparms$c0*scenparms$beta0*
-                (1-ftracescaled)) - 
+  #tmp <- ((1-ftracescaled)/(scenparms$rho+scenparms$lambda*lscale))
+  #tmp <- ((1-ftracescaled)*(1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda*lscale)+
+  #                  scenparms$FAsymp/scenparms$rho)
+  tmp <- (1-ftracescaled)*((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda*lscale)+
+                    scenparms$FAsymp/scenparms$rho)
+  Deltacrit<-(1/(scenparms$S*scenparms$c0*scenparms$beta0*tmp) - 
             scenparms$ThetaMin^(1+scenparms$HygienePwr))/
     (1 - scenparms$ThetaMin^(1+scenparms$HygienePwr))
   Deltacrit[Deltacrit>1]<-1
@@ -692,8 +694,10 @@ if (file.exists("f_lambda_safemap-2020-07-22.RData")) load("f_lambda_safemap-202
     for (j in 1:nrow(gg)){
       fscale <- gg$FTraced[j]/median(parms$FTraced)
       lscale <- gg$lambda[j]/median(parms$lambda)
-      Refft <- parms$R0*parms$S*parms$rho*(1-parms$FTraced*fscale)*
-        parms$HygieneFit*parms$c/parms$c0/(parms$rho+parms$lambda*lscale)
+      #tmp <- (1-parms$FTraced*fscale)/(parms$rho+parms$lambda*lscale)
+      #tmp <- (1-parms$FTraced*fscale)*(1-parms$FAsymp)/(parms$rho+parms$lambda*lscale) + parms$FAsymp/parms$rho
+      tmp <- (1-parms$FTraced*fscale)*((1-parms$FAsymp)/(parms$rho+parms$lambda*lscale) + parms$FAsymp/parms$rho)
+      Refft <- parms$R0*parms$S*parms$rho*tmp*parms$HygieneFit*parms$c/parms$c0
       gg$PrRle1[j] <- ecdf(Refft)(1)
     }
     gg$state<-statenow
