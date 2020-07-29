@@ -45,7 +45,7 @@ names(allcumdat.df)[names(allcumdat.df)=="variable"] <- "Output_Var"
 names(allcumdat.df)[names(allcumdat.df)=="value"] <- "Data"
 
 datadatestart<-"2020-03-01"
-preddateend<-"2020-08-15"
+preddateend<-"2020-09-30"
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
 ))
@@ -129,7 +129,7 @@ for (statenow in statesplot) {
     geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
     ylab("Daily reported cases or deaths")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
     scale_x_date(date_minor_breaks = "1 week",date_breaks = "month",date_labels = "%b")+
-    geom_rect(data=rampup.df,aes(xmin = as.Date("2020-07-01"), xmax = as.Date("2020-07-15"), 
+    geom_rect(data=rampup.df,aes(xmin = as.Date("2020-08-01"), xmax = as.Date("2020-08-15"), 
               ymin=0,ymax=Inf,alpha = "Ramp-up period"))+
     scale_alpha_manual(values=0.2)+
     #scale_y_log10(limits=c(1,NA))+
@@ -156,7 +156,7 @@ ggsave("Fig3ABCDcurrent_07_22-08-15.jpeg",plot=fig3current,height=4,width=6,scal
 ```{r scenario Refft, echo=FALSE,fig.height=4,fig.width=6}
 
 
-preddate<-c("2020-07-15")
+preddate<-c("2020-08-15")
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
   rep("character",4),rep("numeric",2)
 ))
