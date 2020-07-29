@@ -262,3 +262,110 @@ write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
 ```
 
 
+```{r scenario Rt, echo=FALSE,fig.height=4,fig.width=6}
+
+
+preddate<-c("2020-08-15")
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+statesarr <- fips_table$Alpha.code[2:52]
+
+# New facet label names 
+DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
+names(DeltaDelta.labs) <- c("0", "0.25")
+mu_Lambda.labs <- c("Testing Rate 1X", "Testing Rate 2X")
+names(mu_Lambda.labs) <- c("1", "2")
+mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
+names(mu_C.labs) <- c("1", "2")
+out.labs <- c("Daily reported cases","Daily confirmed deaths")
+names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+scen.df <- data.frame(state=sort(rep(statesarr,12)),
+                      mu_C = rep(rep(c(1,1,2,2),3),length(statesarr)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statesarr)),
+                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4)),length(statesarr)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta==0.25,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+scen.df$scenfactor <- factor(scen.df$scenariodesc,
+                             levels=rev(head(scen.df$scenariodesc,12)))
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="N_pos"] <- "positiveIncrease"
+  scendat$Output_Var[scendat$Output_Var=="D_pos"] <- "deathIncrease"
+  scendat$Output_Var[scendat$Output_Var=="CumDeath"] <- "death"
+  scendat$Output_Var[scendat$Output_Var=="CumPosTest"] <- "positive"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date==preddate)
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  scendat$scenariodesc <- scenrow$scenariodesc
+  scendat$scenfactor <- scenrow$scenfactor
+  allscendat<-rbind(allscendat,scendat)
+}
+
+Reffscendat <- subset(allscendat,Output_Var == "Rt" & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
+Reffscendat$R.le.1 <- as.numeric(Reffscendat$Prediction.75.<1)
+p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
+  theme(legend.position = "bottom")
+print(p)
+#ggsave("heatmap.pdf",p,height=5,width=15)
+Reffscendat.wide<-spread(Reffscendat[,c("state","scenfactor","R.le.1")],scenfactor,R.le.1)
+Grade.df <- data.frame(state=Reffscendat.wide$state)
+Grade.df$value<-"Very High"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
+                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
+                 (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+Grade.df$value <- factor(Grade.df$value,levels=
+                           c("None","Low","Moderate","High","Very High"))
+Reffscendat.mat<-as.matrix(Reffscendat.wide[,-1])
+rownames(Reffscendat.mat)<-Reffscendat.wide[,1]
+heatmap(t(Reffscendat.mat),cexRow = 0.5,cexCol = 0.5)
+Reffscendat$stateorder <- factor(Reffscendat$state,
+                                 levels=Grade.df$state[order(Grade.df$value)])
+porder<-ggplot(Reffscendat,aes(stateorder,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+  scale_fill_viridis_d(option="magma")
+#ggsave("heatmaporder.pdf",porder,height=5,width=15)
+
+
+
+
+pusa<-plot_usmap(data = Grade.df, values = "value") + 
+  scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
+  theme(legend.position = "right")
+print(pusa)
+#ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
+#ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
+
+#write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
+```
