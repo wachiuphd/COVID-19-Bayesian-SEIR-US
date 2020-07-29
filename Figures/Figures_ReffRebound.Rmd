@@ -373,7 +373,6 @@ ggsave("Fig2_ReffRebound.jpeg",plot=figReffRebound,height=4,width=6,scale=1.75)
 folder <- "../SEIR.reopen.state.2020.07.22"
 numDate <- as.numeric(as.Date("2020-07-22"))-as.numeric(as.Date(datezero))
 t <- numDate
-if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData") else {
   scenparms <- data.frame()
   for (statenow in statesarr) { 
     sampfile <- list.files(path=file.path(folder,statenow),
@@ -418,10 +417,9 @@ if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2
     parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
     parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
     scenparms <- rbind(scenparms,parms)
-  }
-  scenparms<-scenparms[,!duplicated(names(scenparms))]
-  scenparms.med<-aggregate(.~state,data=scenparms,median)
 }
+scenparms<-scenparms[,!duplicated(names(scenparms))]
+scenparms.med<-aggregate(.~state,data=scenparms,median)
 
 ```
 
@@ -598,8 +596,8 @@ ggsave("FigS8_corrRt.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
 ggsave("FigS8_corrRt.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
 ```
 
-```{r Delta crit,echo=FALSE,fig.height=3,fig.width=6}
-if (file.exists("scenparms_OneTime-2020-07-22.RData")) load("scenparms_OneTime-2020-07-22.RData")
+
+```{r Delta crit,echo=FALSE,fig.height=6,fig.width=8}
 scenparms<-scenparms[,!duplicated(names(scenparms))]
   
 Deltacritfunc<-function(scenparms,fscale=1,lscale=1) {
@@ -685,7 +683,6 @@ ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.jpeg",plot=p2,height=4,width=6,sca
 ```{r safe maps,echo=FALSE,fig.height=8,fig.width=8}
 ftraceloggrid<-10^seq(-2,0,0.05)
 lambdaloggrid<-10^seq(-2,-0.3,0.05)
-if (file.exists("f_lambda_safemap-2020-07-22.RData")) load("f_lambda_safemap-2020-07-22.RData") else {
   gg.df <- data.frame()
   for (statenow in statesarr) {
     parms<-subset(scenparms,state==statenow)
@@ -703,7 +700,6 @@ if (file.exists("f_lambda_safemap-2020-07-22.RData")) load("f_lambda_safemap-202
     gg$state<-statenow
     gg.df<-rbind(gg.df,gg)
   }
-}
 
 pall<-ggplot(gg.df,aes(x=FTraced,y=lambda)) +
   geom_tile(aes(fill=PrRle1))+
@@ -727,6 +723,4 @@ print(pall)
 
 ggsave("FigS9_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
 ggsave("FigS9_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
-save(scenparms,scenparms.med,file="scenparms_OneTime-2020-07-22.RData")
-save(gg.df,file="f_lambda_safemap-2020-07-22.RData")
 ```
