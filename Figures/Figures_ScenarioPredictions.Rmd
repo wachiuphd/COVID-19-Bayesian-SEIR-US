@@ -214,6 +214,15 @@ for (k in 1:nrow(scen.df)) {
   allscendat<-rbind(allscendat,scendat)
 }
 
+# ReffRtscendat <- subset(allscendat,(Output_Var == "Refft" |Output_Var == "Rt") & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
+# ReffRtscendat$R.le.1 <- as.numeric(ReffRtscendat$Prediction.75.<1)
+# ReffRtscendat$RefftRt <- as.numeric(ReffRtscendat$Prediction.75.<1)
+# p<-ggplot(ReffRtscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
+#   scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
+#   theme(legend.position = "bottom")
+# print(p)
+
+
 Reffscendat <- subset(allscendat,Output_Var == "Refft" & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
 Reffscendat$R.le.1 <- as.numeric(Reffscendat$Prediction.75.<1)
 p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
