@@ -691,51 +691,6 @@ tmpdf.quantiles<-aggregate(.~state,data=tmpdf[,c("state","muCcrit","mulambdacrit
                            quantile,prob=c(0.025,0.5,0.975))
 fwrite(as.data.table(tmpdf.quantiles),"TestTraceCritValues.csv")
 
-# ptrace<-ggplot(tmpdf)+geom_boxplot(aes(x=state,
-#                                        y=muCcrit, # (muCcrit-1)*100,
-#                                        fill=Category),outlier.shape = NA,position="dodge")+
-#   scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
-#                        labels=list(bquote(R[eff](t)<1),
-#                                    bquote(R[eff](t)%~~%1),
-#                                    bquote(R[eff](t)>1)))+
-#   #ylab(bquote(paste("Percent increase in tracing alone for ",R[eff](t)<1)))+
-#   ylab(bquote(paste("Fold increase in tracing alone for ",R[eff](t)<1)))+
-#   scale_y_continuous( labels = function(x) paste0(x, "X"),breaks=1:6)+
-#   theme_bw()+theme(legend.position="bottom")+
-#   geom_hline(yintercept=0)+
-#   coord_cartesian(ylim=c(1,6))
-# print(ptrace)
-# 
-# ptest<-ggplot(tmpdf)+geom_boxplot(aes(x=state,
-#                                        y=mulambdacrit,#(mulambdacrit-1)*100,
-#                                        fill=Category),outlier.shape = NA,position="dodge")+
-#   scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
-#                        labels=list(bquote(R[eff](t)<1),
-#                                    bquote(R[eff](t)%~~%1),
-#                                    bquote(R[eff](t)>1)))+
-#   #ylab(bquote(paste("Percent increase in testing alone for ",R[eff](t)<1)))+
-#   ylab(bquote(paste("Fold increase in testing alone for ",R[eff](t)<1)))+
-#   scale_y_continuous( labels = function(x) paste0(x, "X"),breaks=1:6)+
-#   theme_bw()+theme(legend.position="bottom")+
-#   geom_hline(yintercept=0)+
-#   coord_cartesian(ylim=c(1,6))
-# print(ptest)
-# 
-# pboth<-ggplot(tmpdf)+geom_boxplot(aes(x=state,
-#                                        y=mubothcrit,#(mubothcrit-1)*100,
-#                                        fill=Category),outlier.shape = NA,position="dodge")+
-#   scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
-#                        labels=list(bquote(R[eff](t)<1),
-#                                    bquote(R[eff](t)%~~%1),
-#                                    bquote(R[eff](t)>1)))+
-#   #ylab(bquote(paste("Percent increase in both testing and tracing for ",R[eff](t)<1)))+
-#   ylab(bquote(paste("Fold increase in both testing and tracing for ",R[eff](t)<1)))+
-#   scale_y_continuous( labels = function(x) paste0(x, "X"),breaks=1:6)+
-#   theme_bw()+theme(legend.position="bottom")+
-#   geom_hline(yintercept=0)+
-#   coord_cartesian(ylim=c(1,6))
-# print(pboth)
-
 
 tmpdf.df<-melt(as.data.table(tmpdf),id.vars=c("state","Category","Rt","Refft"),
             measure.vars = c("muCcrit","mulambdacrit","mubothcrit"))
@@ -897,3 +852,104 @@ print(pall)
 ggsave("FigS9_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
 ggsave("FigS9_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
 ```
+
+Critical testing/tracing using R(t) and assuming complete reopening (using c0 and beta0 instead of c and beta).
+
+```{r mu crit using Rt,fig.height=6,fig.width=8}
+scenparms<-scenparms[,!duplicated(names(scenparms))]
+scenparms$Category <- fips_table[as.character(scenparms$state),"RtCategory"]
+
+# checkRefft0 <- scenparms$S*scenparms$c*scenparms$beta*(1 - scenparms$FTraced)*(
+#   (1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+#     scenparms$FAsymp/scenparms$rho
+# )
+# print(quantile(checkRefft0/scenparms$Refft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+
+muCcritreopenfunc<-function(scenparms) {
+  muCcrit <- (1 - 1/(scenparms$c0*scenparms$beta0*
+                       ((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+                          scenparms$FAsymp/scenparms$rho)))/scenparms$FTraced
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - muCcrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  muCcrit[muCcrit<1]<-1
+  return(muCcrit)
+}
+
+mulambdacritreopenfunc<-function(scenparms) {
+  mulambdacrit <- (scenparms$rho/scenparms$lambda)*
+    (scenparms$c0*scenparms$beta0*(1-scenparms$FTraced) - scenparms$rho)/
+    (scenparms$rho - scenparms$FAsymp*scenparms$S*scenparms$c*scenparms$beta*(1-scenparms$FTraced))
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+mulambdacrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  mulambdacrit[mulambdacrit<1]<-1
+  return(mulambdacrit)
+}
+
+mubothcritreopenfunc<-function(scenparms) {
+  tmp_b <- (scenparms$rho*scenparms$lambda+
+              scenparms$c0*scenparms$beta0*(
+                scenparms$FTraced*scenparms$rho - scenparms$FAsymp*scenparms$lambda
+              ))/
+    (scenparms$c0*scenparms$beta0*scenparms$lambda*scenparms$FTraced*scenparms$FAsymp)
+  tmp_c <- scenparms$rho*(scenparms$rho - scenparms$c0*scenparms$beta0)/
+    (scenparms$c0*scenparms$beta0*scenparms$lambda*scenparms$FTraced*scenparms$FAsymp)
+  mubothcrit <- (-tmp_b + sqrt(tmp_b^2 - 4*tmp_c))/2
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - mubothcrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+mubothcrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  mubothcrit[mubothcrit<1]<-1
+  return(mubothcrit)
+}
+
+tmpdf <- cbind(scenparms[,c("state","Rt","Refft","Category")],
+               data.table(muCcrit=muCcritreopenfunc(scenparms),
+                          mulambdacrit=mulambdacritreopenfunc(scenparms),
+                          mubothcrit=mubothcritreopenfunc(scenparms)))
+
+tmpdf.quantiles<-aggregate(.~state,data=tmpdf[,c("state","muCcrit","mulambdacrit","mubothcrit")],
+                           quantile,prob=c(0.025,0.5,0.975))
+
+
+tmpdf.df<-melt(as.data.table(tmpdf),id.vars=c("state","Category","Rt","Refft"),
+            measure.vars = c("muCcrit","mulambdacrit","mubothcrit"))
+tmpdf.df$variable<-factor(tmpdf.df$variable,levels=c(
+  "mulambdacrit","muCcrit","mubothcrit"
+))
+dflabs<-c("Increase Testing","Increase Tracing","Increase Testing and Tracing")
+names(dflabs)<-c("mulambdacrit","muCcrit","mubothcrit")
+
+ptesttracereopen<-ggplot(data=tmpdf.df,
+       aes(x=state,
+           y=value,fill=Category
+           )) + 
+    geom_boxplot(outlier.shape = NA,position="dodge")+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #ylab(bquote(paste("Percent increase in both testing and tracing for ",R[eff](t)<1)))+
+  ylab(bquote(paste("Fold increase in testing and/or tracing for R(reopen)<1")))+
+  scale_y_continuous( labels = function(x) paste0(x, "X"),breaks=1:10)+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom")+
+  geom_hline(yintercept=0)+
+  coord_cartesian(ylim=c(1,10))+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+print(ptesttracereopen)
+fwrite(as.data.table(tmpdf.quantiles),"RtReopen_TestTraceCritValues.csv")
+ggsave("FigS11_TestingTracingReopen.2020.07.22.pdf",plot=ptesttracereopen,height=4,width=6,scale=1.75)
+ggsave("FigS11_TestingTracingReopen.2020.07.22.jpeg",plot=ptesttracereopen,height=4,width=6,scale=1.75)
+
+
+```
+
+
