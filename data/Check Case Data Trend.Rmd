@@ -1,0 +1,116 @@
+---
+title: "Check Case Data Trend"
+author: "Weihsueh Chiu"
+date: "7/30/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,dpi = 600)
+library(tidyverse)
+library(covid19us)
+library(jsonlite)
+library(rvest)
+library(data.table)
+library(RCurl)
+datezero <- "2019-12-31"
+functiondir <- "../functions"
+source(file.path(functiondir,"get_fips_function.R"))
+source(file.path(functiondir,"get_testdata_functions.R"))
+
+```
+
+## Load case data with 7-day rolling mean (centered)
+
+
+```{r load mean data,echo=FALSE}
+fips_table <- fread("FIPS_TABLE.csv")
+
+testdat.df <- get_testdata()
+testdat.df <- subset(testdat.df,variable=="positiveIncrease" & 
+                       state %in% fips_table$Alpha.code[2:52] &
+                       numDate > (as.numeric(as.Date("2020-05-15")) - as.numeric(as.Date(datezero))))
+mean7dat.df <- get_meantestdata()
+mean7dat.df <- subset(mean7dat.df,variable=="meanpositiveIncrease" & 
+                       state %in% fips_table$Alpha.code[2:52] &
+                       numDate > (as.numeric(as.Date("2020-05-15")) - as.numeric(as.Date(datezero))))
+# mean14dat.df <- get_meantestdata(nmean = 14)
+# mean14dat.df <- subset(mean14dat.df,variable=="meanpositiveIncrease" & 
+#                        state %in% fips_table$Alpha.code[2:52] &
+#                        numDate > (as.numeric(as.Date("2020-06-20")) - as.numeric(as.Date(datezero))))
+
+mean7max <- subset(mean7dat.df,numDate > (as.numeric(as.Date("2020-06-20")) - 
+                                            as.numeric(as.Date(datezero)))) %>%
+  group_by(state) %>%
+  mutate(ismax = (max(value,na.rm=TRUE) == value))
+mean7max <- as.data.frame(subset(mean7max, ismax))
+
+stateorder <- mean7max$state[!duplicated(mean7max$state)]
+testdat.df$state<-factor(testdat.df$state,levels=stateorder)
+mean7dat.df$state<-factor(mean7dat.df$state,levels=stateorder)
+mean7max$state<-factor(mean7max$state,levels=stateorder)
+# mean14max <- mean14dat.df %>%
+#   group_by(state) %>%
+#   mutate(ismax = (max(value,na.rm=TRUE) == value))
+# mean14max <- subset(mean14max, ismax)
+```
+
+## Peaks in the range of concern
+
+First we are only worred about states with peaks after June 20 and before July 22.  So looking at the graph, that leaves the states up to Georgia (GA).
+
+```{r peak before July 22, echo=FALSE, fig.width=10,fig.height=8}
+
+p<-ggplot(aes(x=date,y=value),data=testdat.df)+
+  geom_col(aes(col="Daily reported cases",linetype="July 06"),fill=NA)+
+  geom_line(data=mean7dat.df,aes(col="Rolling 7-day mean"))+
+  scale_color_viridis_d(begin=0.2,end=0.8)+
+  facet_wrap(~state,scales="free_y")+
+  geom_vline(aes(xintercept=as.Date("2020-07-06"),linetype="July 06"))+
+  geom_vline(aes(xintercept=as.Date("2020-07-16"),linetype="July 16"))+
+  geom_vline(aes(xintercept=as.Date("2020-07-22"),linetype="July 22"))+
+  geom_point(data=mean7max,aes(color="Max of 7-day mean"),size=3)+
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90))
+print(p)
+
+mean7max <- subset(mean7max, date < as.Date("2020-07-22"))
+mean7dat.df <- subset(mean7dat.df, state %in% mean7max$state)
+testdat.df <- subset(testdat.df,state %in% mean7max$state)
+
+```
+
+## Look for re-opened and then re-sheltered states
+
+Next, we are only worried about states that have clearly re-opened and then re-sheltering, so that excludes ME, DE, VT, NY, and DC.
+
+```{r peak, echo=FALSE, fig.width=10,fig.height=8}
+
+noreopen <- c("ME","DE","VT","NY","DC")
+mean7max <- subset(mean7max, !(state %in% noreopen))
+mean7dat.df <- subset(mean7dat.df, !(state %in% noreopen))
+testdat.df <- subset(testdat.df, !(state %in% noreopen))
+p <- ggplot(aes(x=date,y=value),data=testdat.df)+
+  geom_col(aes(col="Daily reported cases",linetype="July 06"),fill=NA)+
+  geom_line(data=mean7dat.df,aes(col="Rolling 7-day mean"),size=2)+
+  scale_color_viridis_d(begin=0.2,end=0.8)+
+  facet_wrap(~state,scales="free_y")+
+  geom_vline(aes(xintercept=as.Date("2020-07-06"),linetype="July 06"))+
+  geom_vline(aes(xintercept=as.Date("2020-07-16"),linetype="July 16"))+
+  geom_vline(aes(xintercept=as.Date("2020-07-22"),linetype="July 22"))+
+  geom_point(data=mean7max,aes(color="Max of 7-day mean"),size=3)+
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90))
+print(p)#+coord_cartesian(xlim=as.Date(c("2020-07-01","2020-07-30"))))
+# ggsave("Check Case Data Trend-July.pdf",p+coord_cartesian(xlim=as.Date(c("2020-07-01","2020-07-30"))),
+#        dpi=300,height=8,width=10)
+```
+
+That leaves 15 states where there is a potential "plateau" or "decline" indicating a reversal of re-opening.
+
+```{r print 15 states,echo=FALSE}
+print(mean7max)
+```
+
