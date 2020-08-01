@@ -28,10 +28,9 @@ datezero <- "2019-12-31"
 source(file.path(functiondir,"get_reopendata_function.R"))
 ```
 
-## Impact of different scenarios on daily cases and deaths
+## Load data
 
-
-```{r scenarioplots currentreopening, echo=FALSE,fig.height=4,fig.width=6}
+```{r load scenarios, echo=FALSE}
 
 folder <- "../SEIR.reopen.state.2020.07.22"
 alldat.df <- read.csv(file.path(folder,"DAILYTESTDATA.csv"))
@@ -61,6 +60,14 @@ mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
 names(mu_C.labs) <- c("1", "2")
 out.labs <- c("Daily reported cases","Daily confirmed deaths")
 names(out.labs) <- c("positiveIncrease","deathIncrease")
+
+
+```
+
+## Impact of different scenarios on daily cases and deaths for selected states
+
+
+```{r scenarioplots current reopening data, echo=FALSE,fig.height=4,fig.width=6}
 
 statesplot <- c("NY","OH","TX","WA")
 scen.df <- data.frame(state=sort(rep(statesplot,4)),
@@ -101,12 +108,26 @@ for (k in 1:nrow(scen.df)) {
   allscendat<-rbind(allscendat,scendat)
 }
 
+dummydf <- scen.df
+dummydf$Output_Var<-"deathIncrease"
+dummydf$Data<-10
+dummydf2 <- scen.df
+dummydf2$Output_Var<-"positiveIncrease"
+dummydf2$Data<-118
+dummydf <- rbind(dummydf,dummydf2)
+dummydf$Date <- as.Date(preddateend)
+```
+
+```{r do plots, echo=FALSE,fig.height=4,fig.width=6}
 for (statenow in statesplot) {
+  dummy <- subset(dummydf,state==statenow)
   dat.df <- subset(alldat.df,state==statenow)
   obsdat.df<-subset(dat.df,state==statenow & (
     Output_Var == "positiveIncrease" | Output_Var == "deathIncrease"
   )) 
   cumdat.df <- subset(allcumdat.df,state==statenow)
+  obsdat.df$Data <- 100000*obsdat.df$Data/fips_table[statenow,"pop"]
+  cumdat.df$Data <- 100000*cumdat.df$Data/fips_table[statenow,"pop"]
   obsdat.df<-rbind(obsdat.df,
                    subset(cumdat.df,state==statenow & (
     Output_Var == "positive" | Output_Var == "death"
@@ -118,8 +139,14 @@ for (statenow in statesplot) {
                    Date >= datadatestart & 
                    Date <= preddateend)
   #ymax<-max(tmpdat$Prediction.97.5.,10)
+  tmpdat$Prediction.2.5. <- 100000*tmpdat$Prediction.2.5./fips_table[statenow,"pop"]
+  tmpdat$Prediction.25. <- 100000*tmpdat$Prediction.25./fips_table[statenow,"pop"]
+  tmpdat$Prediction.50. <- 100000*tmpdat$Prediction.50./fips_table[statenow,"pop"]
+  tmpdat$Prediction.75. <- 100000*tmpdat$Prediction.75./fips_table[statenow,"pop"]
+  tmpdat$Prediction.97.5. <- 100000*tmpdat$Prediction.97.5./fips_table[statenow,"pop"]
   rampup.df <- subset(tmpdat,Date==preddateend)
   p0<-ggplot(tmpdat)+
+    geom_point(data=dummy,aes(x=Date,y=Data),shape=NA)+
     geom_col(aes(x=Date,y=Data),data=subset(obsdat.df,Output_Var=="positiveIncrease"|
                                               Output_Var=="deathIncrease"))+
     geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
@@ -127,7 +154,8 @@ for (statenow in statesplot) {
     geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
                     fill="IQR"),alpha=0.8)+
     geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
-    ylab("Daily reported cases or deaths")+scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
+    ylab("Daily reported cases or deaths per 100,000")+
+    scale_fill_viridis_d(option="magma",begin = 0.6,end=0.95) +
     scale_x_date(date_minor_breaks = "1 week",date_breaks = "month",date_labels = "%b")+
     geom_rect(data=rampup.df,aes(xmin = as.Date("2020-08-01"), xmax = as.Date("2020-08-15"), 
               ymin=0,ymax=Inf,alpha = "Ramp-up period"))+
@@ -153,8 +181,7 @@ ggsave("Fig3ABCDcurrent_07_22-08-15.jpeg",plot=fig3current,height=4,width=6,scal
 ```
 
 
-```{r scenario Refft, echo=FALSE,fig.height=6,fig.width=8}
-
+```{r scenario Refft, echo=FALSE,fig.height=6,fig.width=15}
 
 preddate<-c("2020-08-15")
 fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
@@ -230,24 +257,50 @@ p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
   theme(legend.position = "bottom")
 print(p)
 #ggsave("heatmap.pdf",p,height=5,width=15)
+```
+
+```{r scenario grades,fig.height=6,fig.width=8}
+
 Reffscendat.wide<-spread(Reffscendat[,c("state","scenfactor","R.le.1")],scenfactor,R.le.1)
 Grade.df <- data.frame(state=Reffscendat.wide$state)
 Grade.df$value<-"Very High"
-Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+
+### Very Low = can reopen > 25%
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "Very Low"
+### Low = can reopen < 25%
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+### Moderate = can reopen with testing
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
-                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
-                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+                  Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1] <- "Moderate"
+### High = can reopen with contact tracing, or sheltering, but not with testing
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
-                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
-                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
-                 (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+                 Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 &
+                  (Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1 |
                     Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+### Very high = everything else
 Grade.df$value <- factor(Grade.df$value,levels=
-                           c("None","Low","Moderate","High","Very High"))
+                           c("Very Low","Low","Moderate","High","Very High"))
+
+
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+#                  (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 |
+#                     Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+#                  (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 &
+#                     Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
+#                  (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+#                     Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+# Grade.df$value <- factor(Grade.df$value,levels=
+#                            c("None","Low","Moderate","High","Very High"))
+
 Reffscendat.mat<-as.matrix(Reffscendat.wide[,-1])
 rownames(Reffscendat.mat)<-Reffscendat.wide[,1]
 heatmap(t(Reffscendat.mat),cexRow = 0.5,cexCol = 0.5)
@@ -264,14 +317,14 @@ pusa<-plot_usmap(data = Grade.df, values = "value") +
   scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
   theme(legend.position = "right")
 print(pusa)
-ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
-ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
-
-write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
+# ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
+# ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
+# 
+# write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
 ```
 
 
-```{r scenario Rt, echo=FALSE,fig.height=4,fig.width=6}
+```{r scenario Rt, echo=FALSE,fig.height=4,fig.width=15}
 
 
 preddate<-c("2020-08-15")
@@ -338,25 +391,58 @@ p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
   scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
   theme(legend.position = "bottom")
 print(p)
-#ggsave("heatmap.pdf",p,height=5,width=15)
+ggsave("Rtheatmap.pdf",p,height=5,width=15)
+```
+
+
+```{r scenario map Rt, echo=FALSE,fig.height=6,fig.width=8}
 Reffscendat.wide<-spread(Reffscendat[,c("state","scenfactor","R.le.1")],scenfactor,R.le.1)
 Grade.df <- data.frame(state=Reffscendat.wide$state)
 Grade.df$value<-"Very High"
-Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+### Very Low = can reopen > 25%
+Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "Very Low"
+### Low = can reopen < 25% with testing
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
-                 Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+                 (Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1 |
+                    Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1)] <- "Low"
+### Moderate = need tracing or sheltering
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
-                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
-                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+                  Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 &
+                 (Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1 |
+                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)
+                  ] <- "Moderate"
+### High = can reopen with multiple interventions of contact tracing, testing, and/or sheltering,
 Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
-                 (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
-                    Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
-                 (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
-                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+                 Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 &
+                 Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0 &
+                    Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==0 &
+                  (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current-25% Reopening`==1 |
+                     Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+                     Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current-25% Reopening`==1 |
+                     Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current-25% Reopening`==1)] <- "High"
+### Very high = everything else
 Grade.df$value <- factor(Grade.df$value,levels=
-                           c("None","Low","Moderate","High","Very High"))
+                           c("Very Low","Low","Moderate","High","Very High"))
+# 
+# 
+# 
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==1] <- "None"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==1] <- "Low"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+#                  (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==1 | 
+#                     Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==1)] <- "Moderate"
+# Grade.df$value[Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current+25% Reopening`==0 &
+#                  Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current Reopening`==0 &
+#                  (Reffscendat.wide$`1X Contact Tracing, 2X Testing, Current Reopening`==0 & 
+#                     Reffscendat.wide$`2X Contact Tracing, 1X Testing, Current Reopening`==0) &
+#                  (Reffscendat.wide$`2X Contact Tracing, 2X Testing, Current Reopening`==1 |
+#                     Reffscendat.wide$`1X Contact Tracing, 1X Testing, Current-25% Reopening`==1)] <- "High"
+# Grade.df$value <- factor(Grade.df$value,levels=
+#                            c("None","Low","Moderate","High","Very High"))
 Reffscendat.mat<-as.matrix(Reffscendat.wide[,-1])
 rownames(Reffscendat.mat)<-Reffscendat.wide[,1]
 heatmap(t(Reffscendat.mat),cexRow = 0.5,cexCol = 0.5)
@@ -370,11 +456,11 @@ porder<-ggplot(Reffscendat,aes(stateorder,scenfactor))+geom_tile(aes(fill=(R.le.
 
 
 pusa<-plot_usmap(data = Grade.df, values = "value") + 
-  scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
+  scale_fill_viridis_d(name = "Mitigation Need\nJuly 22, 2020", option="magma",direction=-1,begin=0.35) + 
   theme(legend.position = "right")
 print(pusa)
-#ggsave("Fig5A_MitigationNeed.pdf",plot=pusa,height=4,width=6)
-#ggsave("Fig5A_MitigationNeed.jpeg",plot=pusa,height=4,width=6)
+ggsave("Fig5_RtMitigationNeed.pdf",plot=pusa,height=4,width=6)
+ggsave("Fig5_RtMitigationNeed.jpeg",plot=pusa,height=4,width=6)
 
-#write.csv(x = Grade.df,file="MitigationGrades.csv",row.names = FALSE)
+write.csv(x = Grade.df,file="RtMitigationGrades.csv",row.names = FALSE)
 ```

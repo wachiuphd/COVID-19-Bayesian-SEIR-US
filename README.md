@@ -3,7 +3,7 @@ Bayesian COVID-19 SEIR Model for US States
 
 ## System Requirements
 
-This model uses GNU MCSim version 6.1.0, along with R and R Studio. The GNU MCSim code is included in this repository in the MCSim directory, and is compiled directly from R. The software has been tested on maxOS Mojave 10.14.6 and Linux [ADD VERSION].  No non-standard hardware is required.
+This model uses GNU MCSim version 6.1.0, along with R and R Studio. The GNU MCSim code is included in this repository in the MCSim directory, and is compiled directly from R. The software has been tested on maxOS Mojave 10.14.6 and Linux version 2.6.32-754.31.1.el6.x86_64 (mockbuild@x86-01.bsys.centos.org) (gcc version 4.4.7 20120313 (Red Hat 4.4.7-23) (GCC) ).  No non-standard software or hardware is required.
 
 The R version and package information is as follows:
 
@@ -211,8 +211,7 @@ The markdown file *Figures_FitParameters.Rmd* generates the standalone Supplemen
 
 For more detailed analysis, samples need to be obtained for state variables as well as parameters on July 22, so the script *run_plot_scenarios_OneTime.R* is run first to generate these values.  The markdown file *Figures_ReffRebound.Rmd* first generates Figure 2 with Reff(t) and the transmission rebound *Fig2_ReffRebound.pdf*.  It also generates the ANOVA analysis of what are the greatest contributors to R(t) (*RefftANOVAtable.xlsx*) and the correlation plots in Supplemental Figure 8 (*FigS8_corr.2020.07.22.pdf*).  Next it generates the critical level of reopening permitted while keeping Reff(t)<1 under different scenarios, summarized Figure 4 *Fig4_DeltacritDeltaCurrent.2020.07.22.pdf*.  Finally, it generates the contour map of the combinations of testing and tracing that permit Reff(t) to be less then 1 at varying levels of confidence, summarized in Supplemental Figure S9 *FigS9_fC_lambda_Contour.2020.07.22.pdf*.
 
-*TBD* 
-Table 2 - Needed tracing/testing at current reopening level; Needed tracing/testing at 100% reopening level.
+Additionally, the critical amounts of testing or tracing needed to reduce Reff(t) or R(t) below 1 are calculated in the markdown file *Figures_CritTestingTracing.Rmd*.  This generates Figures S11 and S12 (*FigS11_TestingTracing.2020.07.22.pdf* and *FigS11_TestingTracingReopen.2020.07.22.pdf*, respectively).  The critical values are tabulated in CSV files *TestTraceCritValues.csv* and *RtReopen_TestTraceCritValues.csv*.  For testing, an upper bound of 1 per day was enforced, and if the critical value exceeds this value, then an infinite value is substitituted, indicating that the level of testing is "impossible" to achieve. 
 
 ### Time-series predictions for Testing, Tracing, Re-opening Scenarios
 
@@ -220,4 +219,8 @@ To generate time-series predictions of the course of the epidemic under differen
 
 Then the markdown file *Figures_ScenarioPredictions.Rmd* first generates the reopening examples in Figure 3 *Fig3ABCDcurrent_07_22-08-15.pdf*, as well as the mitigation map in Figure 5 *Fig5A_MitigationNeed.pdf*, with the mitigation grades summarized in the file *MitigationGrades.csv*.
 
-Note that Figures 1 and 5 are composites created in Powerpoint, and the Figure files created here are imported to Powerpoint to create them.
+Note that Figure 1 is a composite created in Powerpoint, and the Figure file created is imported to Powerpoint to create it.
+
+### Mobility data comparison
+
+To generate the analysis comparing mobility data to posterior SEIR model distributions for relevant parameters, use the markdown file *Mobility Accuracy.Rmd*, which generates the figure file *MobilityFits.vs.Posterior.Distributions.pdf*, which serves as Figure S13.

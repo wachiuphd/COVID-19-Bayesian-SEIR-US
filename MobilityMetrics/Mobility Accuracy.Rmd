@@ -1,0 +1,141 @@
+---
+title: "Mobility Accuracy"
+author: "Weihsueh Chiu"
+date: "8/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(plyr)
+folder <- "../SEIR.reopen.state.2020.07.22"
+```
+
+## Load mobility fits and posterior distributions
+
+
+```{r load, echo=FALSE}
+fitparms.df <- fread("MobilityParms-2020-07-21.csv")
+
+fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
+  rep("character",4),rep("numeric",2)
+))
+rownames(fips_table) <- fips_table$Alpha.code
+statesarr <- fips_table$Alpha.code[2:52]
+allparms <- data.frame()
+allpriors <- data.frame()
+
+for (statenow in statesarr) { 
+  sampfile <- list.files(path=file.path(folder,statenow),
+                           pattern="*samps.out",
+                         full.names=TRUE)
+  parms <- read.delim(sampfile,as.is=TRUE,sep=" ")
+  names(parms)<-gsub(".1.","",names(parms))
+  names(parms)<-gsub("GM_","",names(parms))
+  parms$state <- factor(statenow,levels=(sort(statesarr)))
+  # parms$Log10NInit <- log10(parms$NInit)
+  # parms$alpha <- 1/parms$TIsolation
+  # parms$kappa <- 1/parms$TLatent
+  # parms$rho <- 1/parms$TRecover
+  # parms$lambda0 <- parms$TestingCoverage*parms$TestSensitivity/parms$TTestingRate;
+  # parms$lambda0_C <- 1.0*parms$TestSensitivity/parms$TContactsTestingRate;
+  # parms$rho0_C <- 1.0*(1.0 - parms$TestSensitivity)/parms$TContactsTestingRate;
+  # parms$beta0 <- parms$R0 * parms$rho / parms$c0;
+  # parms$HygieneMin <- parms$ThetaMin^parms$HygienePwr;
+  # ## Time dependent parameters, evaluated at last day
+  # parms$ThetaFit <- (parms$ThetaMin - 
+  #                       (parms$ThetaMin - 1)*
+  #                       exp(-((t-60)/parms$TauTheta)^parms$PwrTheta));
+  # ## Reopening - increase contacts/day
+  # parms$TimeReopen = 60+parms$TauTheta+parms$TauS;
+  # parms$ReopenStart = (1 - 1/(1 + exp(4*(t - parms$TimeReopen))));
+  # parms$ReopenStop =  (1 - 1/(1 + exp(4*(t - (parms$TimeReopen+parms$TauR)))));
+  # parms$ReopenPct = ((t - parms$TimeReopen)*(parms$rMax/parms$TauR)*(parms$ReopenStart-parms$ReopenStop)+parms$rMax*parms$ReopenStop);
+  # ## Contacts/day
+  # parms$c = parms$c0 * (parms$ThetaFit + (1 - parms$ThetaMin) * parms$ReopenPct); 
+  # ## Hygiene - reduce infection probability/infected contact
+  # parms$HygieneFit <- parms$ThetaFit^parms$HygienePwr;
+  # parms$beta <- parms$beta0 * parms$HygieneFit; # infection probability/infected contact
+  # parms$Delta <- (parms$c*parms$beta -
+  #                             parms$c0*parms$beta0*
+  #                             parms$ThetaMin^(1+parms$HygienePwr))/
+  #   (parms$c0*parms$beta0 -
+  #      parms$c0*parms$beta0*
+  #      parms$ThetaMin^(1+parms$HygienePwr))
+  # ## Time dependence of testing/contact tracting
+  # parms$TestingTimeDep <- (1-1/(1+exp((t-parms$T50Testing)/parms$TauTesting))); 
+  # ## Contact tracing
+  # parms$FTraced <- parms$FracTraced * parms$TestingTimeDep;
+  # ## Testing
+  # parms$lambda <- parms$TestingTimeDep * parms$lambda0; 
+  # parms$lambda_C <- parms$TestingTimeDep * parms$lambda0_C; 
+  # parms$rho_C <- parms$TestingTimeDep * parms$rho0_C;
+  # parms$fracpos = parms$FTraced*parms$lambda_C/(parms$lambda_C + parms$rho_C)+(1-parms$FTraced)*parms$lambda/(parms$lambda+parms$rho); # fraction of infected that are tested and positive
+  # ## Case fatality
+  # parms$fracposmin <- parms$IFR / 0.9; # max 90% of cases fatal
+  # parms$CFR <- ifelse(parms$fracpos > parms$fracposmin, parms$IFR/parms$fracpos, 0.9); # Adjust infected fatality to (tested) case fatality
+  # parms$delta <- parms$rho * parms$CFR/(1-parms$CFR);
+  # parms$Rt <- parms$R0*parms$rho*(1-parms$FTraced)*
+  #       parms$HygieneFit*parms$c/parms$c0*(
+  #         (1 - parms$FAsymp)/(parms$rho+parms$lambda)+
+  #           parms$FAsymp/parms$rho)
+  allparms <- rbind(allparms,parms)
+}
+allparms.df <- melt(as.data.table(
+  allparms[,c("iter","state","ThetaMin","TauTheta","PwrTheta","TauS","TauR","rMax")]),
+  id.vars=1:2)
+
+names(fitparms.df)[names(fitparms.df)=="State.Abbr"]<-"state"
+fitparms.df$variable[fitparms.df$variable=="thetamin"]<-"ThetaMin"
+fitparms.df$variable[fitparms.df$variable=="tautheta"]<-"TauTheta"
+fitparms.df$variable[fitparms.df$variable=="ntheta"]<-"PwrTheta"
+fitparms.df$variable[fitparms.df$variable=="taus"]<-"TauS"
+fitparms.df$variable[fitparms.df$variable=="taur"]<-"TauR"
+fitparms.df$variable[fitparms.df$variable=="rmax"]<-"rMax"
+
+allparms.df.quants<-aggregate(value~state+variable,data=allparms.df,
+                            quantile,prob=c(0.025,0.05,0.25,0.5,0.75,0.95,0.975))
+```
+
+## Scatter plot for each variable
+
+You can also embed plots, for example:
+
+```{r scatter, echo=FALSE,fig.height=6,fig.width=6}
+varnames <- unique(allparms.df$variable)
+pdf("MobilityFits.vs.Posterior.Distributions.pdf",height=6,width=6)
+for (varnow in varnames) {
+  tmp <- merge(subset(fitparms.df,variable==varnow),
+               subset(allparms.df.quants,variable==varnow))
+  print(summary(lm(value.50. ~ value*MobilityMetric, tmp)))
+  lm_eqn = function(df){
+      m = lm(value.50. ~ value, df);
+      eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2,
+           list(a = as.numeric(format(coef(m)[1], digits = 2)),
+                b = as.numeric(format(coef(m)[2], digits = 2)),
+               r2 = format(summary(m)$r.squared, digits = 3)))
+      as.character(as.expression(eq));
+  }
+  eq <- ddply(tmp,.(MobilityMetric),lm_eqn)
+  
+  p<-ggplot(data=tmp,aes(x=value,y=value.50.))+
+    geom_pointrange(aes(x=value,ymin = value.2.5., y = value.50., ymax = value.97.5.,
+                        color="Mobility Fits and Posterior Distributions"))+
+    geom_abline(aes(slope=1,intercept=0,color="y=x"))+ 
+    facet_wrap(~MobilityMetric)+
+    geom_smooth(method = "lm", se = F, aes(color="regression"), formula = y ~ x)+
+    xlab("Mobility Data Fit")+
+    ylab("SEIR Model posterior distribution (median, 95% CrI)")+
+    ggtitle(varnow)+
+    theme(legend.position="bottom")+
+    scale_color_viridis_d(begin=0.2,end=0.8)+
+    geom_text(data=eq,aes(x = 0, y = 0,label=V1), size=2,hjust=0, vjust=-0.1, parse = TRUE, inherit.aes=FALSE)+
+    facet_wrap(~MobilityMetric)
+  print(p)
+}
+dev.off()
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

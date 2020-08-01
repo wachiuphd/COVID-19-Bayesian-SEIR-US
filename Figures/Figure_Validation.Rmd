@@ -82,6 +82,7 @@ Example states: one from each major region of the US: New York (Northeast), Ohio
 
 ```{r validation example states, echo=FALSE, fig.height=4.87,fig.width=8}
 egstates <- c("OH","NY","TX","WA")
+
 calvaldat.df <- subset(allcalvaldat,state %in% egstates)
 
 ## Observed/predicted daily
@@ -113,29 +114,48 @@ if (novalid) {
 obsnames <- c("Daily reported cases","Daily confirmed deaths")
 names(obsnames) <- c("positiveIncrease","deathIncrease")
 
-calvaldat.df$Prediction.2.5.[calvaldat.df$Prediction.2.5.<0.1]<-0.1
-calvaldat.df$Prediction.25.[calvaldat.df$Prediction.25.<0.1]<-0.1
-calvaldat.df$Prediction.50.[calvaldat.df$Prediction.50.<0.1]<-0.1
-calvaldat.df$Prediction.75.[calvaldat.df$Prediction.75.<0.1]<-0.1
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.<0.1]<-0.1
-
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 &
                                 calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="deathIncrease"]<-1000
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>200 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>200 &
                                 calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="deathIncrease"]<-200
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 &
                                 calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="deathIncrease"]<-100
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>100 &
                                 calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="deathIncrease"]<-100
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>12500 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>12500 &
                                 calvaldat.df$state == "NY" & calvaldat.df$Output_Var=="positiveIncrease"]<-12500
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>3000 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>3000 &
                                 calvaldat.df$state == "OH" & calvaldat.df$Output_Var=="positiveIncrease"]<-3000
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>5000 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>5000 &
                                 calvaldat.df$state == "TX" & calvaldat.df$Output_Var=="positiveIncrease"]<-5000
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 & 
+calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.>1000 &
                                 calvaldat.df$state == "WA" & calvaldat.df$Output_Var=="positiveIncrease"]<-1000
+
+
+calvaldat.df$Prediction.2.5.<-100000*calvaldat.df$Prediction.2.5./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.25.<-100000*calvaldat.df$Prediction.25./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.50.<-100000*calvaldat.df$Prediction.50./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.75.<-100000*calvaldat.df$Prediction.75./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.97.5.<-100000*calvaldat.df$Prediction.97.5./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+
+obsdat.df$Data <- 100000*obsdat.df$Data/fips_table[as.character(obsdat.df$state),"pop"]
+
+dummydf <- data.table(state=egstates)
+dummydf$Output_Var<-"deathIncrease"
+dummydf$Data<-10
+dummydf2 <- data.table(state=egstates)
+dummydf2$Output_Var<-"positiveIncrease"
+dummydf2$Data<-118
+dummydf <- rbind(dummydf,dummydf2)
+dummydf$Date <- as.Date(validdate)
+
 p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+      #geom_point(data=dummydf,aes(x=Date,y=Data),shape=NA)+
   geom_col(aes(x=Date,y=Data,fill="",
                              alpha=Calibration),data=obsdat.df)+
   geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
@@ -144,7 +164,7 @@ p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deat
                   fill="IQR",alpha=Calibration))+
   geom_line(aes(x=Date,y=Prediction.50.,linetype="Median",
                              alpha=Calibration))+
-  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
+  scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
   scale_x_date(date_minor_breaks = "1 day")+
   facet_wrap(~Output_Var*state,ncol=4,
                   labeller = labeller(Output_Var = obsnames),
@@ -163,6 +183,7 @@ p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deat
                          linetype="dotted",color="black") +
   #scale_y_log10(breaks=10^(0:10))+
         #annotation_logticks(sides="l")+
+       ylab("Daily reported cases or deaths per 100,000")+
         labs(fill="",linetype="Prediction",alpha="Dataset")+
         guides(alpha = guide_legend(order = 1,nrow=1),
          linetype = guide_legend(order = 2),

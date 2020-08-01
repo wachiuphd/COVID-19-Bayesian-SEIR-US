@@ -111,24 +111,43 @@ if (novalid) {
 obsnames <- c("Daily reported cases","Daily confirmed deaths")
 names(obsnames) <- c("positiveIncrease","deathIncrease")
 
-calvaldat.df$Prediction.2.5.[calvaldat.df$Prediction.2.5.<0.1]<-0.1
-calvaldat.df$Prediction.25.[calvaldat.df$Prediction.25.<0.1]<-0.1
-calvaldat.df$Prediction.50.[calvaldat.df$Prediction.50.<0.1]<-0.1
-calvaldat.df$Prediction.75.[calvaldat.df$Prediction.75.<0.1]<-0.1
-calvaldat.df$Prediction.97.5.[calvaldat.df$Prediction.97.5.<0.1]<-0.1
+calvaldat.df$Prediction.2.5.<-100000*calvaldat.df$Prediction.2.5./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.25.<-100000*calvaldat.df$Prediction.25./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.50.<-100000*calvaldat.df$Prediction.50./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.75.<-100000*calvaldat.df$Prediction.75./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+calvaldat.df$Prediction.97.5.<-100000*calvaldat.df$Prediction.97.5./fips_table[
+  as.character(calvaldat.df$state),"pop"]
+
+obsdat.df$Data <- 100000*obsdat.df$Data/fips_table[as.character(obsdat.df$state),"pop"]
+
+dummydf <- data.table(state=egstates)
+dummydf$Output_Var<-"deathIncrease"
+dummydf$Data<-5
+dummydf2 <- data.table(state=egstates)
+dummydf2$Output_Var<-"positiveIncrease"
+dummydf2$Data<-60
+dummydf <- rbind(dummydf,dummydf2)
+dummydf$Date <- as.Date(validdate)
+
 
 p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deathIncrease"))+
+  #geom_point(data=dummydf,aes(x=Date,y=Data),shape=NA)+
   geom_col(aes(x=Date,y=Data,fill=""),alpha=0.8,data=obsdat.df)+
   geom_ribbon(aes(x=Date,ymin=Prediction.2.5.,ymax=Prediction.97.5.,
                   fill="CrI"),alpha=0.8)+
   geom_ribbon(aes(x=Date,ymin=Prediction.25.,ymax=Prediction.75.,
                   fill="IQR"),alpha=0.8)+
   geom_line(aes(x=Date,y=Prediction.50.,linetype="Median"))+
-  ylab("")+scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
+  scale_fill_viridis_d(option="magma",begin = 0.2,end=0.95) +
   scale_x_date(date_minor_breaks = "1 day")+
   facet_wrap(~Output_Var*state,ncol=4,
                   labeller = labeller(Output_Var = obsnames),
                 scales="free_y")+
+  ylab("Daily reported cases or deaths per 100,000")+
   theme_bw()+theme(legend.position = "bottom",
                    legend.title = element_text(size = 8),
                     legend.text = element_text(size = 8),
@@ -142,7 +161,7 @@ p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deat
 
 
 print(p)
-ggsave("FigS5.pdf",plot=p,height=4.5,width=13,scale=0.8)
+ggsave("FigS5.pdf",plot=p,height=7,width=13,scale=0.8)
 # ggsave("FigS5.png",plot=p,height=4.5,width=13,scale=1.1)
 # ggsave("FigS5.jpeg",plot=p,height=4.5,width=13,scale=1.1)
 
