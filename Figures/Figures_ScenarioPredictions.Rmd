@@ -200,10 +200,10 @@ names(mu_C.labs) <- c("1", "2")
 out.labs <- c("Daily reported cases","Daily confirmed deaths")
 names(out.labs) <- c("positiveIncrease","deathIncrease")
 
-scen.df <- data.frame(state=sort(rep(statesarr,12)),
-                      mu_C = rep(rep(c(1,1,2,2),3),length(statesarr)),
-                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statesarr)),
-                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4)),length(statesarr)),
+scen.df <- data.frame(state=sort(rep(statesarr,16)),
+                      mu_C = rep(rep(c(1,1,2,2),4),length(statesarr)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),4),length(statesarr)),
+                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4),rep(-0.5,4)),length(statesarr)),
                       stringsAsFactors = FALSE
 )
 scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
@@ -213,12 +213,12 @@ scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
                                scen.df$mu_Lambda,"X Testing, Current",
                                 ifelse(scen.df$DeltaDelta==0.25,
                                        paste0("+",100*scen.df$DeltaDelta,"%"),
-                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                       ifelse(scen.df$DeltaDelta== -0.25 | scen.df$DeltaDelta== -0.5,
                                               paste0(100*scen.df$DeltaDelta,"%"),
                                               "")),
                                " Reopening")
 scen.df$scenfactor <- factor(scen.df$scenariodesc,
-                             levels=rev(head(scen.df$scenariodesc,12)))
+                             levels=rev(head(scen.df$scenariodesc,16)))
 allscendat <-data.frame()
 for (k in 1:nrow(scen.df)) {
   scenrow <- scen.df[k,]
@@ -344,10 +344,10 @@ names(mu_C.labs) <- c("1", "2")
 out.labs <- c("Daily reported cases","Daily confirmed deaths")
 names(out.labs) <- c("positiveIncrease","deathIncrease")
 
-scen.df <- data.frame(state=sort(rep(statesarr,12)),
-                      mu_C = rep(rep(c(1,1,2,2),3),length(statesarr)),
-                      mu_Lambda = rep(rep(c(1,2,1,2),3),length(statesarr)),
-                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4)),length(statesarr)),
+scen.df <- data.frame(state=sort(rep(statesarr,16)),
+                      mu_C = rep(rep(c(1,1,2,2),4),length(statesarr)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),4),length(statesarr)),
+                      DeltaDelta = rep(c(rep(0.25,4),rep(0,4),rep(-0.25,4),rep(-0.5,4)),length(statesarr)),
                       stringsAsFactors = FALSE
 )
 scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
@@ -357,12 +357,12 @@ scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
                                scen.df$mu_Lambda,"X Testing, Current",
                                 ifelse(scen.df$DeltaDelta==0.25,
                                        paste0("+",100*scen.df$DeltaDelta,"%"),
-                                       ifelse(scen.df$DeltaDelta== -0.25,
+                                       ifelse(scen.df$DeltaDelta== -0.25 | scen.df$DeltaDelta== -0.5,
                                               paste0(100*scen.df$DeltaDelta,"%"),
                                               "")),
                                " Reopening")
 scen.df$scenfactor <- factor(scen.df$scenariodesc,
-                             levels=rev(head(scen.df$scenariodesc,12)))
+                             levels=rev(head(scen.df$scenariodesc,16)))
 allscendat <-data.frame()
 for (k in 1:nrow(scen.df)) {
   scenrow <- scen.df[k,]
@@ -385,13 +385,13 @@ for (k in 1:nrow(scen.df)) {
   allscendat<-rbind(allscendat,scendat)
 }
 
-Reffscendat <- subset(allscendat,Output_Var == "Rt" & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
+Reffscendat <- subset(allscendat,Output_Var == "Rt")# & (DeltaDelta<=0 | (mu_C==1 & mu_Lambda==1)))
 Reffscendat$R.le.1 <- as.numeric(Reffscendat$Prediction.75.<1)
 p<-ggplot(Reffscendat,aes(state,scenfactor))+geom_tile(aes(fill=(R.le.1==1)))+
   scale_fill_viridis_d(option="magma")+labs(fill=bquote(paste("IQR of ",R[eff](t)<1)))+
   theme(legend.position = "bottom")
 print(p)
-ggsave("Rtheatmap.pdf",p,height=5,width=15)
+ggsave("Rtheatmap.pdf",p,height=10,width=15)
 ```
 
 
@@ -456,7 +456,7 @@ porder<-ggplot(Reffscendat,aes(stateorder,scenfactor))+geom_tile(aes(fill=(R.le.
 
 
 pusa<-plot_usmap(data = Grade.df, values = "value") + 
-  scale_fill_viridis_d(name = "Mitigation Need\nJuly 22, 2020", option="magma",direction=-1,begin=0.35) + 
+  scale_fill_viridis_d(name = "Mitigation Need", option="magma",direction=-1,begin=0.35) + 
   theme(legend.position = "right")
 print(pusa)
 ggsave("Fig5_RtMitigationNeed.pdf",plot=pusa,height=4,width=6)

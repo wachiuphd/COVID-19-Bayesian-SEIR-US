@@ -145,7 +145,236 @@ scenparms$Category <- preddat.df[as.character(scenparms$state),"Category"]
 
 ```
 
-## Critical values of testing and tracing to achieve R[eff](t)<1
+## Critical values of testing and tracing rates to achieve R[eff](t)<1
+
+If critical value of testing > 1 per day, then an infinite value is assigned to represent that it cannot be achieved.
+
+```{r lambda fc crit,fig.height=6,fig.width=10, echo=FALSE}
+
+fCcritfunc<-function(scenparms) {
+  fCcrit <- (1 - 1/(scenparms$S*scenparms$c*scenparms$beta*
+                       ((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+                          scenparms$FAsymp/scenparms$rho)))
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - fCcrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  #fCcrit[scenparms$Refft<=1]<-scenparms$FTraced[scenparms$Refft<=1]
+  fCcrit[fCcrit<0]<-0
+  return(fCcrit)
+}
+
+lambdacritfunc<-function(scenparms) {
+  lambdacrit <- scenparms$rho*
+    (scenparms$S*scenparms$c*scenparms$beta*(1-scenparms$FTraced) - scenparms$rho)/
+    (scenparms$rho - scenparms$FAsymp*scenparms$S*scenparms$c*scenparms$beta*(1-scenparms$FTraced))
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+lambdacrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  lambdacrit[lambdacrit > 1] <- Inf
+  #lambdacrit[scenparms$Refft<=1]<-scenparms$lambda[scenparms$Refft<=1]
+  lambdacrit[lambdacrit<0]<-0
+  return(lambdacrit)
+}
+
+mubothcritfunc<-function(scenparms) {
+  tmp_b <- (scenparms$rho+
+              scenparms$S*scenparms$c*scenparms$beta*(
+                scenparms$rho - scenparms$FAsymp
+              ))/
+    (scenparms$S*scenparms$c*scenparms$beta*scenparms$FAsymp)
+  tmp_c <- scenparms$rho*(scenparms$rho - scenparms$S*scenparms$c*scenparms$beta)/
+    (scenparms$S*scenparms$c*scenparms$beta*scenparms$FAsymp)
+  mubothcrit <- (-tmp_b + sqrt(tmp_b^2 - 4*tmp_c))/2
+  # checkRefft <- scenparms$S*scenparms$c*scenparms$beta*(1 - mubothcrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+mubothcrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRefft,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  mubothcrit[mubothcrit > 1] <- Inf
+  #mubothcrit[scenparms$Refft<=1] <- NA
+  return(mubothcrit)
+}
+
+tmpdf <- cbind(scenparms[,c("state","Rt","Refft","Category","lambda","FTraced")],
+               data.table(fCcrit=fCcritfunc(scenparms),
+                          lambdacrit=lambdacritfunc(scenparms),
+                          mubothcrit=mubothcritfunc(scenparms))
+                          )
+
+tmpdf.quantiles<-aggregate(.~state,data=tmpdf[,c("state","fCcrit","lambdacrit","mubothcrit")],
+                           quantile,prob=c(0.025,0.05,0.25,0.5,0.75,0.95,0.975))
+fwrite(as.data.table(tmpdf.quantiles),"TestTraceCritValues.csv")
+
+
+tmpdf.df<-melt(as.data.table(tmpdf),id.vars=c("state","Category","Rt","Refft","lambda","FTraced"),
+            measure.vars = c("fCcrit","lambdacrit","mubothcrit"))
+tmpdf.df$variable<-factor(tmpdf.df$variable,levels=c(
+  "lambdacrit","fCcrit","mubothcrit"
+))
+#tmpdf.df$value[is.infinite(tmpdf.df$value)]<-1e6
+
+current.df <- aggregate(.~state,data=tmpdf[,c("state","Category","lambda","FTraced")],median)
+tmpdf2.df <- data.table(state=rep(current.df$state,3),
+                        variable=c(rep("lambdacrit",nrow(current.df)),
+                                   rep("fCcrit",nrow(current.df)),
+                                   rep("mubothcrit",nrow(current.df))),
+                        lambda=rep(current.df$lambda,3),
+                        FTraced=rep(current.df$FTraced),3)
+tmpdf2.df$variable<-factor(tmpdf2.df$variable,levels=c(
+  "lambdacrit","fCcrit","mubothcrit"
+))
+tmpdf2.df[tmpdf2.df$variable=="lambdacrit","FTraced"]<-NA
+tmpdf2.df[tmpdf2.df$variable=="fCcrit","lambda"]<-NA
+
+dflabs<-c("Critical Testing Rate","Critical Tracing Fraction",
+          "Critical Combined Testing Rate and Tracing Fraction")
+names(dflabs)<-c("lambdacrit","fCcrit","mubothcrit")
+
+ptesttrace<-ggplot(data=tmpdf.df,
+       aes(x=state,
+           y=value)) + 
+    geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
+  geom_point(aes(x=state,y=lambda,shape="Current Testing Rate (Median estimate)"),data=tmpdf2.df)+
+  geom_point(aes(x=state,y=FTraced,shape="Current Fraction Traced (Median estimate)"),data=tmpdf2.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #ylab(bquote(paste("Percent increase in both testing and tracing for ",R[eff](t)<1)))+
+  ylab(bquote(paste("Testing rate ",(d^{-1})," and/or fraction traced for ",R[eff](t)<1)))+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom")+
+  geom_hline(yintercept=0)+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+print(ptesttrace)
+ggsave("FigS11_TestingTracing.2020.07.22.pdf",plot=ptesttrace,height=4,width=6,scale=1.75)
+ggsave("FigS11_TestingTracing.2020.07.22.jpeg",plot=ptesttrace,height=4,width=6,scale=1.75)
+
+```
+
+
+## Critical values of testing and tracing rates to achieve R(t)<1
+
+Critical testing/tracing using R(t) and assuming complete reopening (using c0 and beta0 instead of c and beta). If critical value of testing > 1 per day, then an infinite value is assigned to represent that it cannot be achieved.fitparms.df$variable[fitparms.df$variable=="thetamin"]<-"ThetaMin"
+
+
+```{r mu crit using Rt,fig.height=6,fig.width=10, echo=FALSE}
+
+fCreopencritfunc<-function(scenparms) {
+  fCreopencrit <- (1 - 1/(scenparms$c*scenparms$beta*
+                       ((1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+                          scenparms$FAsymp/scenparms$rho)))
+  # checkRt <- scenparms$c*scenparms$beta*(1 - fCreopencrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRt,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  #fCreopencrit[scenparms$Rt<=1]<-scenparms$FTraced[scenparms$Rt<=1]
+  fCreopencrit[fCreopencrit<0]<-0
+  return(fCreopencrit)
+}
+
+lambdareopencritfunc<-function(scenparms) {
+  lambdareopencrit <- scenparms$rho*
+    (scenparms$c*scenparms$beta*(1-scenparms$FTraced) - scenparms$rho)/
+    (scenparms$rho - scenparms$FAsymp*scenparms$c*scenparms$beta*(1-scenparms$FTraced))
+  # checkRt <- scenparms$S*scenparms$c*scenparms$beta*(1 - scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+lambdareopencrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRt,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  lambdareopencrit[lambdareopencrit > 1] <- Inf
+  #lambdareopencrit[scenparms$Rt<=1]<-scenparms$lambda[scenparms$Rt<=1]
+  lambdareopencrit[lambdareopencrit<0]<-0
+  return(lambdareopencrit)
+}
+
+mubothreopencritfunc<-function(scenparms) {
+  tmp_b <- (scenparms$rho+
+              scenparms$c*scenparms$beta*(
+                scenparms$rho - scenparms$FAsymp
+              ))/
+    (scenparms$c*scenparms$beta*scenparms$FAsymp)
+  tmp_c <- scenparms$rho*(scenparms$rho - scenparms$c*scenparms$beta)/
+    (scenparms$c*scenparms$beta*scenparms$FAsymp)
+  mubothreopencrit <- (-tmp_b + sqrt(tmp_b^2 - 4*tmp_c))/2
+  # checkRt <- scenparms$c*scenparms$beta*(1 - mubothreopencrit*scenparms$FTraced)*(
+  #   (1-scenparms$FAsymp)/(scenparms$rho+mubothreopencrit*scenparms$lambda)+
+  #     scenparms$FAsymp/scenparms$rho
+  # )
+  # print(quantile(checkRt,prob=c(0,0.01,0.05,0.5,0.95,0.99,1)))
+  mubothreopencrit[mubothreopencrit > 1] <- Inf
+  #mubothreopencrit[scenparms$Rt<=1] <- NA
+  return(mubothreopencrit)
+}
+
+tmpdf <- cbind(scenparms[,c("state","Rt","Refft","Category","lambda","FTraced")],
+               data.table(fCreopencrit=fCreopencritfunc(scenparms),
+                          lambdareopencrit=lambdareopencritfunc(scenparms),
+                          mubothreopencrit=mubothreopencritfunc(scenparms))
+                          )
+
+tmpdf.quantiles<-aggregate(.~state,data=tmpdf[,c("state","fCreopencrit","lambdareopencrit","mubothreopencrit")],
+                           quantile,prob=c(0.025,0.05,0.25,0.5,0.75,0.95,0.975))
+fwrite(as.data.table(tmpdf.quantiles),"RtReopen_TestTraceCritValues.csv")
+
+
+
+tmpdf.df<-melt(as.data.table(tmpdf),id.vars=c("state","Category","Rt","Refft","lambda","FTraced"),
+            measure.vars = c("fCreopencrit","lambdareopencrit","mubothreopencrit"))
+tmpdf.df$variable<-factor(tmpdf.df$variable,levels=c(
+  "lambdareopencrit","fCreopencrit","mubothreopencrit"
+))
+#tmpdf.df$value[is.infinite(tmpdf.df$value)]<-1e6
+
+current.df <- aggregate(.~state,data=tmpdf[,c("state","Category","lambda","FTraced")],median)
+tmpdf2.df <- data.table(state=rep(current.df$state,3),
+                        variable=c(rep("lambdareopencrit",nrow(current.df)),
+                                   rep("fCreopencrit",nrow(current.df)),
+                                   rep("mubothreopencrit",nrow(current.df))),
+                        lambda=rep(current.df$lambda,3),
+                        FTraced=rep(current.df$FTraced),3)
+tmpdf2.df$variable<-factor(tmpdf2.df$variable,levels=c(
+  "lambdareopencrit","fCreopencrit","mubothreopencrit"
+))
+tmpdf2.df[tmpdf2.df$variable=="lambdareopencrit","FTraced"]<-NA
+tmpdf2.df[tmpdf2.df$variable=="fCreopencrit","lambda"]<-NA
+
+dflabs<-c("Critical Testing Rate","Critical Tracing Fraction",
+          "Critical Combined Testing Rate and Tracing Fraction")
+names(dflabs)<-c("lambdareopencrit","fCreopencrit","mubothreopencrit")
+
+preopentesttrace<-ggplot(data=tmpdf.df,
+       aes(x=state,
+           y=value)) + 
+    geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
+  geom_point(aes(x=state,y=lambda,shape="Current Testing Rate (Median estimate)"),data=tmpdf2.df)+
+  geom_point(aes(x=state,y=FTraced,shape="Current Fraction Traced (Median estimate)"),data=tmpdf2.df)+
+  scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
+                       labels=list(bquote(R[eff](t)<1),
+                                   bquote(R[eff](t)%~~%1),
+                                   bquote(R[eff](t)>1)))+
+  #ylab(bquote(paste("Percent increase in both testing and tracing for ",R(t)<1)))+
+  ylab(bquote(paste("Testing rate ",(d^{-1})," and/or fraction traced for ",R(t)<1)))+
+  labs(fill="",color="",shape="")+
+  theme_bw()+theme(legend.position="bottom")+
+  geom_hline(yintercept=0)+
+  facet_wrap(~variable,ncol=1,
+             labeller = labeller(variable=dflabs))
+print(preopentesttrace)
+
+ggsave("FigS12_TestingTracingReopen.2020.07.22.pdf",plot=preopentesttrace,height=4,width=6,scale=1.75)
+ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",plot=preopentesttrace,height=4,width=6,scale=1.75)
+
+```
+
+
+## Critical values of fold-increases in testing and tracing to achieve R[eff](t)<1
 
 If critical value of testing > 1 per day, then an infinite value is assigned to represent that it cannot be achieved.
 
@@ -245,7 +474,7 @@ ggsave("FigS11_TestingTracing.2020.07.22.jpeg",plot=ptesttrace,height=4,width=6,
 ```
 
 
-## Critical values of testing and tracing to achieve R(t)<1
+## Critical values of fold-increases in testing and tracing to achieve R(t)<1
 
 Critical testing/tracing using R(t) and assuming complete reopening (using c0 and beta0 instead of c and beta). If critical value of testing > 1 per day, then an infinite value is assigned to represent that it cannot be achieved.fitparms.df$variable[fitparms.df$variable=="thetamin"]<-"ThetaMin"
 
@@ -337,8 +566,8 @@ ptesttracereopen<-ggplot(data=tmpdf.df,
              labeller = labeller(variable=dflabs))
 print(ptesttracereopen)
 fwrite(as.data.table(tmpdf.quantiles),"RtReopen_TestTraceCritValues.csv")
-ggsave("FigS12_TestingTracingReopen.2020.07.22.pdf",plot=ptesttracereopen,height=4,width=6,scale=1.75)
-ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",plot=ptesttracereopen,height=4,width=6,scale=1.75)
+# ggsave("FigS12_TestingTracingReopen.2020.07.22.pdf",plot=ptesttracereopen,height=4,width=6,scale=1.75)
+# ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",plot=ptesttracereopen,height=4,width=6,scale=1.75)
 
 
 ```
