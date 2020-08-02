@@ -253,7 +253,7 @@ ptesttrace<-ggplot(data=tmpdf.df,
              labeller = labeller(variable=dflabs))
 print(ptesttrace)
 ggsave("FigS11_TestingTracing.2020.07.22.pdf",plot=ptesttrace,height=4,width=6,scale=1.75)
-ggsave("FigS11_TestingTracing.2020.07.22.jpeg",plot=ptesttrace,height=4,width=6,scale=1.75)
+ggsave("FigS11_TestingTracing.2020.07.22.jpeg",dpi=600,plot=ptesttrace,height=4,width=6,scale=1.75)
 
 ```
 
@@ -369,7 +369,7 @@ preopentesttrace<-ggplot(data=tmpdf.df,
 print(preopentesttrace)
 
 ggsave("FigS12_TestingTracingReopen.2020.07.22.pdf",plot=preopentesttrace,height=4,width=6,scale=1.75)
-ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",plot=preopentesttrace,height=4,width=6,scale=1.75)
+ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",dpi=600,plot=preopentesttrace,height=4,width=6,scale=1.75)
 
 ```
 
