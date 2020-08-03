@@ -162,8 +162,7 @@ p<-ggplot(subset(calvaldat.df,Output_Var=="positiveIncrease" | Output_Var=="deat
 
 print(p)
 ggsave("FigS5.pdf",plot=p,height=7,width=13,scale=0.8)
-# ggsave("FigS5.png",plot=p,height=4.5,width=13,scale=1.1)
-# ggsave("FigS5.jpeg",plot=p,height=4.5,width=13,scale=1.1)
+ggsave("FigS5.jpeg",plot=p,dpi=600,height=7,width=13,scale=0.8)
 
 ```
 

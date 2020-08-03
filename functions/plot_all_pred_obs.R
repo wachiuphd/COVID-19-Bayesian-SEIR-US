@@ -10,36 +10,7 @@ source(file.path(functiondir,"get_testdata_functions.R"))
 datezero <- '2019-12-31'
 cumpreddatemax <- "2020-08-31"
 
-# folder <- "SEIR.constant.valid"
-# calibdate <- "2020-04-01"
-# novalid <- FALSE
-# validdate <- "2020-04-30"
-# folder <- "SEIR.constant.shelter"
-# novalid <- FALSE
-# calibdate <- ""
-# validdate <- "2020-06-06"
-
-# folder <- "SEIR.reopen.2020.06.05"
-# calibdate <- "2020-06-05"
-# novalid <- FALSE
-# validdate <- "2020-06-10"
-
 # folder <- "SEIR.reopen.2020.04.30"
-# calibdate <- "2020-04-30"
-# novalid <- FALSE
-# validdate <- "2020-06-13"
-
-# folder <- "SEIR.reopen.2020.05.15"
-# calibdate <- "2020-05-15"
-# novalid <- FALSE
-# validdate <- "2020-06-13"
-
-# folder <- "SEIR.reopen.2020.06.13"
-# calibdate <- "2020-06-13"
-# novalid <- FALSE
-# validdate <- "2020-06-13"
-
-# folder <- "SEIR.reopen.state.2020.04.30"
 # calibdate <- "2020-04-30"
 # novalid <- FALSE
 # validdate <- "2020-06-20"
@@ -49,50 +20,10 @@ cumpreddatemax <- "2020-08-31"
 # novalid <- FALSE
 # validdate <- "2020-06-20"
 
-# folder <- "SEIR.reopen.state.2020.05.15"
-# calibdate <- "2020-05-15"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.state.alt.2020.04.30"
-# calibdate <- "2020-04-30"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.state.alt.2020.06.20"
-# calibdate <- "2020-06-20"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.alt.2020.04.30"
-# calibdate <- "2020-04-30"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-# 
-# folder <- "SEIR.reopen.state.2020.06.20"
-# calibdate <- "2020-06-20"
-# novalid <- FALSE
-# validdate <- "2020-07-22"
-
-# folder <- "SEIR.reopen.alt2.2020.04.30"
-# calibdate <- "2020-04-30"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.2020.04.30"
-# calibdate <- "2020-04-30"
-# novalid <- FALSE
-# validdate <- "2020-06-20"
-
-# folder <- "SEIR.reopen.state.2020.07.22"
-# calibdate <- "2020-07-22"
-# novalid <- FALSE
-# validdate <- "2020-07-22"
-
-folder <- "SEIR.reopen.state.2020.06.20"
-calibdate <- "2020-06-20"
-novalid <- TRUE
-validdate <- "2020-06-20"
+folder <- "SEIR.reopen.state.2020.07.22"
+calibdate <- "2020-07-22"
+novalid <- FALSE
+validdate <- "2020-07-22"
 
 datadatemax <- calibdate    
 
@@ -145,7 +76,6 @@ if (novalid) {
 ## Observed/predicted daily
 obsnames <- c("Daily reported cases","Daily confirmed deaths")
 names(obsnames) <- c("positiveIncrease","deathIncrease")
-calibvalid.dat <- data.frame()
 pdf(file=file.path(folder,"Daily-obs-pred.pdf"),height=4,width=6)
 for (j in 1:length(csvfiles)) {
   preddat <- preddat.list[[j]]
@@ -195,17 +125,6 @@ for (j in 1:length(csvfiles)) {
                    linetype = guide_legend(order = 2),
                    fill = guide_legend(order = 3)))
   }
-  meanobsdat<-subset(meandat.df,state==statenow & (
-    Output_Var == "meanpositiveIncrease" | Output_Var == "meandeathIncrease" ))
-  meanobsdat$Training <- meanobsdat$Date <= datadatemax
-  meanobsdat$Output_Var <- gsub("mean","",meanobsdat$Output_Var)
-  calibvalid.dat <- rbind(calibvalid.dat,
-                     merge(meanobsdat[,c("state","Date","Output_Var","Data","Training")],
-                           preddat[,c("Date","Output_Var","Prediction.2.5.",
-                                      "Prediction.25.",
-                                      "Prediction.50.",
-                                      "Prediction.75.",
-                                      "Prediction.97.5.")]))
 }
 dev.off()
 
@@ -260,32 +179,6 @@ for (j in 1:length(csvfiles)) {
 }
 dev.off()
 
-if (!novalid) {
-  ## Observed/predicted daily - coverage
-  calibvalid.dat$Training<-ifelse(calibvalid.dat$Training,"Training",
-                                     "Validation")
-  calibvalid.dat$Training<-factor(calibvalid.dat$Training,levels=c("Training",
-                                                                         "Validation"))
-  calibvalid.dat$in.IQR <- calibvalid.dat$Data >= calibvalid.dat$Prediction.25. & 
-    calibvalid.dat$Data <= calibvalid.dat$Prediction.75.
-  calibvalid.dat$in.CI <- calibvalid.dat$Data >= calibvalid.dat$Prediction.2.5. & 
-    calibvalid.dat$Data <= calibvalid.dat$Prediction.97.5.
-  write.csv(calibvalid.dat,file=file.path(folder,"DailyTrainingValidation.csv"))
-  vplotCI <- ggplot(calibvalid.dat)+geom_bar(aes(x=Date,fill=in.CI,
-                                                 alpha=Training),position="fill")+
-    ylab("Fraction")+scale_fill_viridis_d(end=0.7) + geom_hline(yintercept=0.95,color="grey")+
-    scale_alpha_discrete(range=c(1,0.4))+
-    facet_wrap(~Output_Var)
-  vplotIQR <- ggplot(calibvalid.dat)+geom_bar(aes(x=Date,fill=in.IQR,
-                                                  alpha=Training),position="fill")+
-    ylab("Fraction")+scale_fill_viridis_d(end=0.7) + geom_hline(yintercept=0.5,color="grey")+
-    scale_alpha_discrete(range=c(1,0.4))+facet_wrap(~Output_Var)
-  pdf(file=file.path(folder,"DailyTrainingValidation.pdf"),height=4,width=6)
-  print(vplotCI)
-  print(vplotIQR)
-  dev.off()
-}
-
 ## Predicted daily 
 pdf(file=file.path(folder,"Daily-pred.pdf"),height=4,width=6)
 for (j in 1:length(csvfiles)) {
@@ -336,7 +229,6 @@ dev.off()
 ## Observed/predicted cumulative 
 cumnames <- c("Total Positive Tests","Total Confirmed Deaths")
 names(cumnames) <- c("positive","death")
-cumcalibvalid.dat <- data.frame()
 pdf(file=file.path(folder,"Cumulative-obs-pred.pdf"),height=4,width=6)
 for (j in 1:length(csvfiles)) {
   preddat <- preddat.list[[j]]
@@ -396,20 +288,12 @@ for (j in 1:length(csvfiles)) {
                    linetype = guide_legend(order = 2),
                    fill = guide_legend(order = 3)))
   }
-  cumcalibvalid.dat <- rbind(cumcalibvalid.dat,
-                        merge(obsdat[,c("state","Date","Output_Var","Data","Training")],
-                              preddat[,c("Date","Output_Var","Prediction.2.5.",
-                                         "Prediction.25.",
-                                         "Prediction.50.",
-                                         "Prediction.75.",
-                                         "Prediction.97.5.")]))
 }
 dev.off()
 
 ## Observed/predicted cumulative barchart
 cumnames <- c("Total Positive Tests","Total Confirmed Deaths")
 names(cumnames) <- c("positive","death")
-cumcalibvalid.dat <- data.frame()
 pdf(file=file.path(folder,"Cumulative-obs-pred-barchart.pdf"),height=4,width=6)
 for (j in 1:length(csvfiles)) {
   preddat <- preddat.list[[j]]
@@ -460,43 +344,9 @@ for (j in 1:length(csvfiles)) {
                labeller = labeller(Output_Var = cumnames)) +
     ggtitle(paste(statenow,"Cumulative Observed-Predicted"))
   print(p)
-  cumcalibvalid.dat <- rbind(cumcalibvalid.dat,
-                             merge(obsdat[,c("state","Date","Output_Var","Data","Training")],
-                                   preddat[,c("Date","Output_Var","Prediction.2.5.",
-                                              "Prediction.25.",
-                                              "Prediction.50.",
-                                              "Prediction.75.",
-                                              "Prediction.97.5.")]))
 }
 dev.off()
 
-
-
-## Observed/predicted cumulative - Training & validation
-if (!novalid) {
-  cumcalibvalid.dat$Training<-ifelse(cumcalibvalid.dat$Training,"Training",
-                                     "Validation")
-  cumcalibvalid.dat$Training<-factor(cumcalibvalid.dat$Training,levels=c("Training",
-                                                                         "Validation"))
-  cumcalibvalid.dat$in.IQR <- cumcalibvalid.dat$Data >= cumcalibvalid.dat$Prediction.25. & 
-    cumcalibvalid.dat$Data <= cumcalibvalid.dat$Prediction.75.
-  cumcalibvalid.dat$in.CI <- cumcalibvalid.dat$Data >= cumcalibvalid.dat$Prediction.2.5. & 
-    cumcalibvalid.dat$Data <= cumcalibvalid.dat$Prediction.97.5.
-  write.csv(cumcalibvalid.dat,file=file.path(folder,"CumulativeTrainingValidation.csv"))
-  vplotCI <- ggplot(cumcalibvalid.dat)+geom_bar(aes(x=Date,fill=in.CI,
-                                                 alpha=Training),position="fill")+
-    ylab("Fraction")+scale_fill_viridis_d(end=0.7) + geom_hline(yintercept=0.95,color="grey")+
-    scale_alpha_discrete(range=c(1,0.4))+
-    facet_wrap(~Output_Var)
-  vplotIQR <- ggplot(cumcalibvalid.dat)+geom_bar(aes(x=Date,fill=in.IQR,
-                                                  alpha=Training),position="fill")+
-    ylab("Fraction")+scale_fill_viridis_d(end=0.7) + geom_hline(yintercept=0.5,color="grey")+
-    scale_alpha_discrete(range=c(1,0.4))+facet_wrap(~Output_Var)
-  pdf(file=file.path(folder,"CumulativeTrainingValidation.pdf"),height=4,width=6)
-  print(vplotCI)
-  print(vplotIQR)
-  dev.off()
-}
 
 ## Predicted total cumulative
 pdf(file=file.path(folder,"Cumulative-pred.pdf"),height=4,width=6)

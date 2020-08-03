@@ -370,7 +370,7 @@ summary {
 <p>Bayesian COVID-19 SEIR Model for US States</p>
 <div id="system-requirements" class="section level2">
 <h2>System Requirements</h2>
-<p>This model uses GNU MCSim version 6.1.0, along with R and R Studio. The GNU MCSim code is included in this repository in the MCSim directory, and is compiled directly from R. The software has been tested on maxOS Mojave 10.14.6 and Linux [ADD VERSION]. No non-standard hardware is required.</p>
+<p>This model uses GNU MCSim version 6.1.0, along with R and R Studio. The GNU MCSim code is included in this repository in the MCSim directory, and is compiled directly from R. The software has been tested on maxOS Mojave 10.14.6 and Linux version 2.6.32-754.31.1.el6.x86_64 (<a href="mailto:mockbuild@x86-01.bsys.centos.org" class="email">mockbuild@x86-01.bsys.centos.org</a>) (gcc version 4.4.7 20120313 (Red Hat 4.4.7-23) (GCC) ). No non-standard software or hardware is required.</p>
 <p>The R version and package information is as follows:</p>
 <p>─ Session info ───────────────────────────────────────────────── setting value<br />
 version R version 3.6.1 (2019-07-05) os macOS Mojave 10.14.6<br />
@@ -398,8 +398,8 @@ assertthat 0.2.1 2019-03-21 [1] CRAN (R 3.6.0) backports 1.1.5 2019-10-02 [1] CR
 </div>
 <div id="mobility-data-fits" class="section level2">
 <h2>Mobility Data Fits</h2>
-<p>Analysis of mobility data is contained in the “MobilityMetrics” directory. Mobility data were used to generate state-specific prior distributions for social distancing time-dependence. All analyses are in the “Mobility Fits.Rmd” R markdown file. Run each “chunk” and it will generate the results in the generated csv files and summary in the Word “docx” file. Note that these were run on 2020-06-20, so unless the Sys.Date is changed to that date, the results will be include mobility data since that date in the analysis.</p>
-<p>Note that Supplementary Figure 1 is “MobilityFitExample.pdf” and Supplementary Figure 2 is “Mobility.pdf”.</p>
+<p>Analysis of mobility data is contained in the “MobilityMetrics” directory. Mobility data were used to generate state-specific prior distributions for social distancing time-dependence. Initial analyses in June are in the “Mobility Fits.Rmd” R markdown file. Run each “chunk” and it will generate the results in the generated csv files and summary in the Word “docx” file. Subsequent update was performed in July, using “Mobility Fits July.Rmd”.</p>
+<p>Note that “MobilityFitExample-2020-07-21.pdf” is part of Figure 1, and Supplementary Figure 1 is “Mobility-2020-07-21.pdf”.</p>
 </div>
 <div id="demonstration-test-runs" class="section level2">
 <h2>Demonstration Test Runs</h2>
@@ -438,12 +438,42 @@ assertthat 0.2.1 2019-03-21 [1] CRAN (R 3.6.0) backports 1.1.5 2019-10-02 [1] CR
 </div>
 <div id="instructions-for-use-and-reproduction-of-all-results" class="section level2">
 <h2>Instructions for use and reproduction of all results</h2>
-<p>To generate the input files for validation, run the script “setup_batch_validation_SEIR.reopen.R”, which will create a directory “SEIR.reopen.2020.04.30”. Similarly, generate the input files for validation, run the script “setup_batch_predictionn_SEIR.reopen.R”, which will create a dire ctory “SEIR.reopen.state.2020.06.20”. In both cases, each state has its own directory, and a shell script “.jobfile” that runs the analyses.</p>
-<p>Because these were on a cluster (named “ada” - hence the template file in “functions” with that in the name), a tgz archive is also created so it can be uploaded to a cluster. Once on the cluster, the model file is compiled for that platform, and then a shell script “SEIR_run_all.sh” is run to submit all the jobfiles to the cluster.</p>
-<p>After the runs are complete, then tgz archives of all the “.csv” and “samps.out” files are created and downloaded from the cluster for analysis. In the repository, all results files have been uploaded already.</p>
-<p>To generate Supplemental Figure S4, the function “run_plot_validation_scenario.R” should be sourced.</p>
-<p>To run the scenarios, and generated Supplemental Figure S10, the function “run_plot_scenarios.R” should be sourced.</p>
-<p>All other Figures and Supplemental Figures are generated using markdown file in the Figures.Rmd file in the Figures directory. Note that Figures 1 and 5 are composites created in Powerpoint, and the Figure files created here are imported to Powerpoint to create them.</p>
+<div id="running-model-for-different-dates" class="section level3">
+<h3>Running model for different dates</h3>
+<ul>
+<li>To generate the input files for validation, run the script “setup_batch_validation_SEIR.reopen.R”, which will create a directory “SEIR.reopen.2020.04.30”.<br />
+</li>
+<li>Similarly, to generate the input files for prediction to June 20, run the script “setup_batch_prediction_SEIR.reopen.R”, which will create a directory “SEIR.reopen.state.2020.06.20”.</li>
+<li>For the predictions to July 22, run the script “setup_batch_prediction_SEIR.reopen.R”, which will create a directory “SEIR.reopen.state.2020.07.22”.</li>
+</ul>
+<p>In all cases, each state has its own directory, and a shell script “.jobfile” that runs the analyses. Because these are run on a cluster (named “ada” - hence the template file in “functions” with that in the name), a tgz archive is also created so it can be uploaded to a cluster. Once on the cluster, the model file is compiled for that platform, and then a shell script “SEIR_run_all.sh” is run to submit all the jobfiles to the cluster.</p>
+<p>After the runs are complete, then tgz archives of all the “.csv” and “samps.out” files are manually created and downloaded from the cluster for analysis. In the repository, all results files have been uploaded already.</p>
+</div>
+<div id="comparisons-between-model-fitspredictions-to-trainingvalidation-data" class="section level3">
+<h3>Comparisons between model fits/predictions to training/validation data</h3>
+<p>Validation comparisons (training through April 30, validation through June 20) are generated by first running the script <em>run_plot_validation_scenario.R</em> which generates Supplemental Figure S2 as a standalone PDF <em>FigS2_ValidationResults.pdf</em> in the “Figures” directory. Coverage of the 95% CrI including dispersion is summarized in <em>FigS2_ValidationCoverage.csv</em>. Additionally, in the Figures directory, the markdown file <em>Figure_Validation.Rmd</em> generates the example states validation shown in Figure 1, as well as Supplemental Figure S3 <em>FigS3.pdf</em>, the scatter plot of training and validation vs. data.</p>
+<p>A second validation was performed (not shown in text) using training data through June 20, and validation through July 22. The equivalent to Supplement Figure S2 is generated by the script <em>run_plot_validation.2_scenario.R</em>, generating <em>FigS2_Validation.2.Results.pdf</em> and <em>FigS2_Validation.2.Coverage.csv</em> in the “Figures” directory. An analogous markdown file <em>Figure_Validation.2.Rmd</em> generates the equivalent example states validation shown in Figure 1, as well as the equivalent Supplemental Figure S3 <em>FigS3.2.pdf</em>, the scatter plot of training and validation vs. data.</p>
+<p>The comparisons of model fit for the prediction run are generated first with <em>run_plot_fit_scenario.R</em>, which generates <em>FigS4_FitResults.pdf</em> and “FigS4_FitCoverage.csv”. The markdown file <em>Figure_Fit.Rmd</em>&quot;* generates the example states shown in Supplemental Figure S5 <em>FigS5.pdf</em> and the scatter plot of fit vs. data, Supplemental Figure S6 <em>FigS6.pdf</em>.</p>
+</div>
+<div id="parameter-posteriors-and-correlations" class="section level3">
+<h3>Parameter posteriors and correlations</h3>
+<p>The markdown file <em>Figures_FitParameters.Rmd</em> generates the standalone Supplemental Figure 7 <em>FigS7_Priors_Posteriors_byState_07.22.pdf</em>, which is a comparison of prior and posterior distributions by states, for the prediction run through July 22.</p>
+</div>
+<div id="evaluating-model-and-scenarios-at-july-22" class="section level3">
+<h3>Evaluating model and scenarios at July 22</h3>
+<p>For more detailed analysis, samples need to be obtained for state variables as well as parameters on July 22, so the script <em>run_plot_scenarios_OneTime.R</em> is run first to generate these values. The markdown file <em>Figures_ReffRebound.Rmd</em> first generates Figure 2 with Reff(t) and the transmission rebound <em>Fig2_ReffRebound.pdf</em>. It also generates the ANOVA analysis of what are the greatest contributors to R(t) (<em>RefftANOVAtable.xlsx</em>) and the correlation plots in Supplemental Figure 8 (<em>FigS8_corr.2020.07.22.pdf</em>). Next it generates the critical level of reopening permitted while keeping Reff(t)&lt;1 under different scenarios, summarized Figure 4 <em>Fig4_DeltacritDeltaCurrent.2020.07.22.pdf</em>. Finally, it generates the contour map of the combinations of testing and tracing that permit Reff(t) to be less then 1 at varying levels of confidence, summarized in Supplemental Figure S9 <em>FigS9_fC_lambda_Contour.2020.07.22.pdf</em>.</p>
+<p>Additionally, the critical amounts of testing or tracing needed to reduce Reff(t) or R(t) below 1 are calculated in the markdown file <em>Figures_CritTestingTracing.Rmd</em>. This generates Figures S11 and S12 (<em>FigS11_TestingTracing.2020.07.22.pdf</em> and <em>FigS11_TestingTracingReopen.2020.07.22.pdf</em>, respectively). The critical values are tabulated in CSV files <em>TestTraceCritValues.csv</em> and <em>RtReopen_TestTraceCritValues.csv</em>. For testing, an upper bound of 1 per day was enforced, and if the critical value exceeds this value, then an infinite value is substitituted, indicating that the level of testing is “impossible” to achieve.</p>
+</div>
+<div id="time-series-predictions-for-testing-tracing-re-opening-scenarios" class="section level3">
+<h3>Time-series predictions for Testing, Tracing, Re-opening Scenarios</h3>
+<p>To generate time-series predictions of the course of the epidemic under different testing, tracing, and re-opening scenarios, the script <em>run_plot_scenarios.R</em> should first be sourced to run all the scenarios. This also generates Supplemental Figure S10 <em>FigS10_Scenarios_Results_2020-07-22.pdf</em>.</p>
+<p>Then the markdown file <em>Figures_ScenarioPredictions.Rmd</em> first generates the reopening examples in Figure 3 <em>Fig3ABCDcurrent_07_22-08-15.pdf</em>, as well as the mitigation map in Figure 5 <em>Fig5A_MitigationNeed.pdf</em>, with the mitigation grades summarized in the file <em>MitigationGrades.csv</em>.</p>
+<p>Note that Figure 1 is a composite created in Powerpoint, and the Figure file created is imported to Powerpoint to create it.</p>
+</div>
+<div id="mobility-data-comparison" class="section level3">
+<h3>Mobility data comparison</h3>
+<p>To generate the analysis comparing mobility data to posterior SEIR model distributions for relevant parameters, use the markdown file <em>Mobility Accuracy.Rmd</em>, which generates the figure file <em>MobilityFits.vs.Posterior.Distributions.pdf</em>, which serves as Figure S13.</p>
+</div>
 </div>
 </div>
 

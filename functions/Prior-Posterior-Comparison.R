@@ -6,6 +6,7 @@ datezero <- '2019-12-31'
 val.folder <- "SEIR.reopen.2020.04.30"
 cal.folder <- "SEIR.reopen.state.2020.06.20"
 pred.folder <- "SEIR.reopen.state.2020.07.22"
+figuredir <- "Figures"
 
 ## FIPS table for reference
 fips_table <- read.csv(file.path(val.folder,"FIPS_TABLE.csv"),colClasses=c(
@@ -113,7 +114,7 @@ cal.parmdat.df$Date <- "2020-06-20"
 pred.parmdat.df$Date <- "2020-07-22"
 
 ## Plot by parameter
-pdf(file="AllPriorPost.pdf",height=8,width=10)
+pdf(file=file.path(figuredir,"PriorPostAll.pdf"),height=8,width=10)
 parms <- unique(pred.parmdat.df$Parameter)
 for (parmnow in parms) {
   priors <- rbind(subset(val.prior.df,Parameter==parmnow),
@@ -134,113 +135,9 @@ for (parmnow in parms) {
     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
     ggtitle(parmnow)+
     facet_wrap(~State.abbr)
-  if (parmnow %in% c("GM_NInit","GM_IFR"))
+  if (parmnow %in% c("GM_NInit","GM_IFR","alpha_Pos","alpha_Death"))
     plt <- plt+scale_y_log10()
   print(plt)
 }
 dev.off()
-# 
-# pdf(file="Calib-Under-PriorPost.pdf",height=8,width=10)
-# #Calib_under_states <- c("AK","FL","HI","ID","LA","MT","SD","VT","WV")
-# Calib_under_states <- c("AK","HI","MT","SD","VT","WV")
-# parms <- unique(pred.parmdat.df$Parameter)
-# for (parmnow in parms) {
-#   priors <- rbind(subset(val.prior.df,Parameter==parmnow),
-#                   subset(cal.prior.df,Parameter==parmnow))
-#   priors$Type="Prior"
-#   posteriors <- rbind(subset(val.parmdat.df,Parameter==parmnow),
-#                       subset(cal.parmdat.df,Parameter==parmnow))
-#   posteriors$Type="Posterior"
-#   priorpost <- subset(rbind(priors,posteriors),State.abbr %in% Calib_under_states)
-#   plt<-ggplot(priorpost)+
-#     geom_boxplot(aes(x=Date,lower=`25%`,upper=`75%`,
-#                      min=`2.5%`,max=`97.5%`,middle=`50%`,
-#                      fill=Type),stat="identity")+
-#     coord_flip()+
-#     scale_fill_viridis_d(limits=c("Prior","Posterior"))+
-#     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
-#     ggtitle(paste("Underpredicted States:",parmnow))+
-#     facet_wrap(~State.abbr)
-#   if (parmnow %in% c("GM_NInit","GM_IFR"))
-#     plt <- plt+scale_y_log10()
-#   print(plt)
-# }
-# dev.off()
-# 
-# pdf(file="Calib-Over-PriorPost.pdf",height=8,width=10)
-# #Calib_over_states <- c("IL","IN","IA","MA","MI","MN","OH","WY")
-# Calib_over_states <- c("IL","IN","IA","KS","MI","MN","NE")
-# parms <- unique(pred.parmdat.df$Parameter)
-# for (parmnow in parms) {
-#   priors <- rbind(subset(val.prior.df,Parameter==parmnow),
-#                   subset(cal.prior.df,Parameter==parmnow))
-#   priors$Type="Prior"
-#   posteriors <- rbind(subset(val.parmdat.df,Parameter==parmnow),
-#                       subset(cal.parmdat.df,Parameter==parmnow))
-#   posteriors$Type="Posterior"
-#   priorpost <- subset(rbind(priors,posteriors),State.abbr %in% Calib_over_states)
-#   plt<-ggplot(priorpost)+
-#     geom_boxplot(aes(x=Date,lower=`25%`,upper=`75%`,
-#                      min=`2.5%`,max=`97.5%`,middle=`50%`,
-#                      fill=Type),stat="identity")+
-#     coord_flip()+
-#     scale_fill_viridis_d(limits=c("Prior","Posterior"))+
-#     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
-#     ggtitle(paste("Overpredicted States:",parmnow))+
-#     facet_wrap(~State.abbr)
-#   if (parmnow %in% c("GM_NInit","GM_IFR"))
-#     plt <- plt+scale_y_log10()
-#   print(plt)
-# }
-# dev.off()
-# 
-# pdf(file="Pred-Under-PriorPost.pdf",height=8,width=10)
-# Pred_under_states <- c("GA","ID","IL","IA","LA","MD","MN","MS","ND","OH","PA","VA","WA","WV","WI")
-# parms <- unique(pred.parmdat.df$Parameter)
-# for (parmnow in parms) {
-#   priors <- rbind(subset(cal.prior.df,Parameter==parmnow),
-#                   subset(pred.prior.df,Parameter==parmnow))
-#   priors$Type="Prior"
-#   posteriors <- rbind(subset(cal.parmdat.df,Parameter==parmnow),
-#                       subset(pred.parmdat.df,Parameter==parmnow))
-#   posteriors$Type="Posterior"
-#   priorpost <- subset(rbind(priors,posteriors),State.abbr %in% Pred_under_states)
-#   plt<-ggplot(priorpost)+
-#     geom_boxplot(aes(x=Date,lower=`25%`,upper=`75%`,
-#                      min=`2.5%`,max=`97.5%`,middle=`50%`,
-#                      fill=Type),stat="identity")+
-#     coord_flip()+
-#     scale_fill_viridis_d(limits=c("Prior","Posterior"))+
-#     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
-#     ggtitle(paste("Underpredicted 7/22 States:",parmnow))+
-#     facet_wrap(~State.abbr)
-#   if (parmnow %in% c("GM_NInit","GM_IFR"))
-#     plt <- plt+scale_y_log10()
-#   print(plt)
-# }
-# dev.off()
-# 
-# pdf(file="Pred-Accur-PriorPost.pdf",height=8,width=10)
-# parms <- unique(pred.parmdat.df$Parameter)
-# for (parmnow in parms) {
-#   priors <- rbind(subset(cal.prior.df,Parameter==parmnow),
-#                   subset(pred.prior.df,Parameter==parmnow))
-#   priors$Type="Prior"
-#   posteriors <- rbind(subset(cal.parmdat.df,Parameter==parmnow),
-#                       subset(pred.parmdat.df,Parameter==parmnow))
-#   posteriors$Type="Posterior"
-#   priorpost <- subset(rbind(priors,posteriors),!(State.abbr %in% Pred_under_states))
-#   plt<-ggplot(priorpost)+
-#     geom_boxplot(aes(x=Date,lower=`25%`,upper=`75%`,
-#                      min=`2.5%`,max=`97.5%`,middle=`50%`,
-#                      fill=Type),stat="identity")+
-#     coord_flip()+
-#     scale_fill_viridis_d(limits=c("Prior","Posterior"))+
-#     scale_x_discrete(limits = rev(unique(priorpost$Date)))+
-#     ggtitle(paste("Accurate 7/22 States:",parmnow))+
-#     facet_wrap(~State.abbr)
-#   if (parmnow %in% c("GM_NInit","GM_IFR"))
-#     plt <- plt+scale_y_log10()
-#   print(plt)
-# }
-# dev.off()
+
