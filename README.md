@@ -1,5 +1,5 @@
 # COVID-19-Bayesian-SEIR-US
-Bayesian COVID-19 SEIR Model for US States
+Bayesian COVID-19 Extended SEIR Model for US States
 
 ## System Requirements
 
