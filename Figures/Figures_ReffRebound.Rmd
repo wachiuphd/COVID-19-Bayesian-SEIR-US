@@ -20,6 +20,7 @@ library(dplyr)
 library(metR)
 library(data.table)
 library(usmap)
+library(effectsize)
 knitr::opts_chunk$set(echo = TRUE, dpi = 300, fig.height=6, fig.width=6,message = FALSE,warning=FALSE)
 functiondir <- "../functions"
 modeldir <- "../model"
@@ -115,6 +116,9 @@ pReffMin <- ggplot(preddat.minRt.df)+
   geom_text(aes(x=state,y=0.02+Prediction.97.5.,label=Date,angle=90),hjust=0,size=2)+
   ggtitle(bquote(paste("Minimum value of ",R[eff](t),)))
 print(pReffMin)
+
+# Write Reffmin quantiles to file
+fwrite(preddat.minRt.df,"ReffMin.csv")
 # ggsave("Refft.Min.pdf",plot=pReffMin,height=3,width=6,scale=1.75)
 # ggsave("Refft.Min.jpeg",plot=pReffMin,height=3,width=6,scale=1.75)
 ```
@@ -431,9 +435,12 @@ scenparms.med<-aggregate(.~state,data=scenparms,median)
 
 res<-lm(Refft~.,data=scenparms[,c("R0","HygienePwr","ThetaMin",
                                   "rMax","FracTraced","FAsymp","lambda","rho","Refft")])
-
+print(summary(lm(Refft~.,data=scenparms[,c("ThetaMin","Refft")])))
+print(confint(lm(Refft~.,data=scenparms[,c("ThetaMin","Refft")])))
 print(summary(res))
+print(confint(res))
 print(anova(res))
+print(data.table(eta_squared(anova(res),partial=FALSE,ci=0.95)))
 
 phyg<-ggplot(scenparms,aes(x=Refft,y=HygieneFit,color=state))+
   geom_point(alpha=0.3)+
@@ -505,21 +512,26 @@ ptesting<-ggplot(scenparms,aes(x=Refft,y=lambda,color=state))+
   ylab(bquote(lambda))+
   theme(legend.position="none")
 
-FigS8<-ggarrange(ptheta,phygpwr,
+FigExtData1<-ggarrange(ptheta,phygpwr,
                  preopen,pfc,
                  nrow=2,ncol=2,labels = c("A", "B","C","D"))
-print(FigS8)
+print(FigExtData1)
  
-ggsave("FigS8_corr.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
-ggsave("FigS8_corr.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("ExtDat_Fig1_corr.2020.07.22.pdf",plot=FigExtData1,height=6,width=6,scale=1.75)
+ggsave("ExtDat_Fig1_corr.2020.07.22.jpeg",plot=FigExtData1,height=6,width=6,scale=1.75)
 ```
 
 ```{r contributions to Rt,echo=FALSE,fig.height=8,fig.width=8}
 
 res<-lm(Rt~.,data=allparms[,c("R0","HygienePwr","ThetaMin",
                                   "rMax","FracTraced","FAsymp","lambda","rho","Rt")])
+
+print(summary(lm(Rt~.,data=scenparms[,c("ThetaMin","Rt")])))
+print(confint(lm(Rt~.,data=scenparms[,c("ThetaMin","Rt")])))
 print(summary(res))
+print(confint(res))
 print(anova(res))
+print(data.table(eta_squared(anova(res),partial=FALSE,ci=0.95)))
 
 phyg<-ggplot(allparms,aes(x=Rt,y=HygieneFit,color=state))+
   geom_point(alpha=0.3)+
@@ -591,13 +603,13 @@ ptesting<-ggplot(allparms,aes(x=Rt,y=lambda,color=state))+
   ylab(bquote(lambda))+
   theme(legend.position="none")
 
-FigS8<-ggarrange(preopen,pfc,
+FigExtData1_Rt<-ggarrange(preopen,pfc,
                  ptesting, phygpwr,
                  nrow=2,ncol=2,labels = c("A", "B","C","D"))
-print(FigS8)
+print(FigExtData1_Rt)
  
-ggsave("FigS8_corrRt.2020.07.22.pdf",plot=FigS8,height=6,width=6,scale=1.75)
-ggsave("FigS8_corrRt.2020.07.22.jpeg",plot=FigS8,height=6,width=6,scale=1.75)
+ggsave("ExtDat_Fig1Alt_corrRt.2020.07.22.pdf",plot=FigExtData1_Rt,height=6,width=6,scale=1.75)
+ggsave("ExtDat_Fig1Alt_corrRt.2020.07.22.jpeg",plot=FigExtData1_Rt,height=6,width=6,scale=1.75)
 ```
 
 
@@ -669,8 +681,8 @@ dftmp.med$variable[dftmp.med$variable=="Deltacrit.1.2"]<-"Delta[crit](1,2)"
 dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.1"]<-"Delta[crit](2,1)"
 dftmp.med$variable[dftmp.med$variable=="Deltacrit.2.2"]<-"Delta[crit](2,2)"
 
-dflabs<-c("Baseline","2X testing",
-                          "2X contact tracing","2X testing and contact tracing")
+dflabs<-c("A. Baseline","B. 2X testing",
+                          "C. 2X contact tracing","D. 2X testing and contact tracing")
 names(dflabs)<-c("Delta[crit](1,1)","Delta[crit](1,2)","Delta[crit](2,1)","Delta[crit](2,2)")
 
 p<-ggplot(data=dftmp,
@@ -689,7 +701,8 @@ p<-ggplot(data=dftmp,
   scale_y_continuous(breaks=seq(-25,100,25),limits = c(-25,100))+
   ylab(bquote(paste(Delta[crit],"=Amount of reopening (%) while keeping ",R[eff](t)<1)))+
   labs(fill="",color="",shape="")+
-  theme_bw()+theme(legend.position="bottom"
+  theme_bw()+theme(legend.position="bottom",
+                   strip.text.x = element_text(hjust = 0)
         #            ,
         #            axis.title.x=element_blank(),
         # axis.text.x=element_blank(),
@@ -704,6 +717,7 @@ p2<-p+geom_point(aes(x=state,y=100*Delta,shape="Delta(t)",fill=Category),
   scale_shape_manual(values=21,
                      labels=as.expression(bquote(Delta(t==2020-07-22))))
 print(p2)
+
 ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.pdf",plot=p2,height=4,width=6,scale=1.75)
 ggsave("Fig4_DeltacritDeltaCurrent.2020.07.22.jpeg",plot=p2,height=4,width=6,scale=1.75)
 ```
@@ -750,8 +764,8 @@ pall<-ggplot(gg.df,aes(x=FTraced,y=lambda)) +
   theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
 print(pall)
 
-ggsave("FigS9_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
-ggsave("FigS9_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
+ggsave("ExtDat_Fig2_fC_lambda_Contour.2020.07.22.pdf",plot=pall,height=6,width=6,scale=1.5)
+ggsave("ExtDat_Fig2_fC_lambda_Contour.2020.07.22.jpeg",plot=pall,height=6,width=6,scale=1.5)
 ```
 
 

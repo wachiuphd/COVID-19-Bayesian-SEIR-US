@@ -51,6 +51,86 @@ fips_table <- read.csv(file.path(folder,"FIPS_TABLE.csv"),colClasses=c(
 rownames(fips_table) <- fips_table$Alpha.code
 
 p0list <- list()
+
+```
+
+## Final case and death counts by scenario
+
+```{r final counts}
+statesvec <- fips_table$Alpha.code[2:52]
+
+scen.df <- data.frame(state=sort(rep(statesvec,20)),
+                      mu_C = rep(rep(c(1,1,2,2),5),length(statesvec)),
+                      mu_Lambda = rep(rep(c(1,2,1,2),5),length(statesvec)),
+                      DeltaDelta = rep(c(rep(0,4),rep(0.25,4),rep(0.5,4),rep(-0.25,4),rep(-0.5,4)),length(statesvec)),
+                      stringsAsFactors = FALSE
+)
+scen.df$scenarioname <- paste("TimeSeries",scen.df$mu_C,scen.df$mu_Lambda,
+                              scen.df$DeltaDelta,sep=".")
+scen.df$basename <- paste0("SEIR_",scen.df$state,"_",scen.df$scenarioname,".quantiles.csv")
+scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
+                               scen.df$mu_Lambda,"X Testing, Current",
+                                ifelse(scen.df$DeltaDelta>0,
+                                       paste0("+",100*scen.df$DeltaDelta,"%"),
+                                       ifelse(scen.df$DeltaDelta<0,
+                                              paste0(100*scen.df$DeltaDelta,"%"),
+                                              "")),
+                               " Reopening")
+scen.df$scenfactor <- factor(scen.df$scenariodesc,
+                             levels=head(scen.df$scenariodesc,20))
+allscendat <-data.frame()
+for (k in 1:nrow(scen.df)) {
+  scenrow <- scen.df[k,]
+  statenow <- scenrow$state
+  popnow <- fips_table[statenow,"pop"]
+  csvfile <- file.path(folder,statenow,scenrow$basename)
+  scendat <- read.csv(csvfile,as.is=TRUE)
+  scendat$state <- statenow
+  scendat$Output_Var[scendat$Output_Var=="CumDeath"] <- "CumulativeConfirmedDeaths"
+  scendat$Output_Var[scendat$Output_Var=="CumPosTest"] <- "CumulativeReportedCases"
+  scendat$Date <- as.Date(scendat$Time+60,origin=as.Date(datezero))
+  scendat <- subset(scendat,Date==max(scendat$Date) & Output_Var %in% c(
+    "CumulativeConfirmedDeaths","CumulativeReportedCases"
+  ))
+  scendat$mu_C <- scenrow$mu_C
+  scendat$mu_Lambda <- scenrow$mu_Lambda
+  scendat$DeltaDelta <- scenrow$DeltaDelta
+  scendat$scenariodesc <- scenrow$scenariodesc
+  scendat$scenfactor <- scenrow$scenfactor
+  allscendat<-rbind(allscendat,scendat)
+}
+
+allscendat.df<-data.frame()
+scendatnorm <- subset(allscendat,scenfactor==levels(allscendat$scenfactor)[1])
+allscendat$PctDiff <- 0
+pdf("Fig_Scenarios_CumulPred_Oct01.pdf",height=6,width=12)
+for (scenfactor.now in levels(allscendat$scenfactor)) {
+  scendat <- subset(allscendat,scenfactor==scenfactor.now)
+  scendat$PctDiff <- 100*(scendat$Prediction.50./scendatnorm$Prediction.50. - 1)
+  #print(summary(scendat$PctDiff))
+  ptmp<-ggplot(scendat,aes(x=state,y=PctDiff,group=Output_Var,fill=Output_Var))+
+    geom_col(position="dodge")+
+    coord_cartesian(ylim=c(-100,100))+
+    ylab("Predicted Median Percent Difference in Cumulative Deaths/Reported Cases\non 01-Oct-2020 Relative to Baseline Scenario")+
+    theme_bw()+theme(legend.position="bottom")+
+    scale_fill_viridis_d(begin=0.2,end=0.8,option="plasma",name="")+
+    ggtitle(paste("Scenario:",scenfactor.now))
+  print(ptmp)
+  scendat.df <- pivot_wider(scendat[,c("state","scenariodesc",
+                                       "Output_Var","PctDiff")],
+                            names_from=Output_Var,values_from=PctDiff)
+  allscendat.df <- rbind(allscendat.df,scendat.df)
+}
+dev.off()
+fwrite(allscendat.df,"Fig_Scenarios_CumulPred_Oct01.csv")
+
+```
+
+
+## Impact of different scenarios on daily cases and deaths for selected states
+
+```{r scenarioplots current reopening data, echo=FALSE,fig.height=4,fig.width=6}
+
 # New facet label names 
 DeltaDelta.labs <- c("Current Reopening", "Current +25% Reopening")
 names(DeltaDelta.labs) <- c("0", "0.25")
@@ -60,14 +140,6 @@ mu_C.labs <- c("Contact Tracing 1X", "Contact Tracing 2X")
 names(mu_C.labs) <- c("1", "2")
 out.labs <- c("Daily reported cases","Daily confirmed deaths")
 names(out.labs) <- c("positiveIncrease","deathIncrease")
-
-
-```
-
-## Impact of different scenarios on daily cases and deaths for selected states
-
-
-```{r scenarioplots current reopening data, echo=FALSE,fig.height=4,fig.width=6}
 
 statesplot <- c("NY","OH","TX","WA")
 scen.df <- data.frame(state=sort(rep(statesplot,4)),

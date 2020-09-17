@@ -42,7 +42,7 @@ scen.df$scenariodesc <- paste0(scen.df$mu_C,"X Contact Tracing, ",
                                       ifelse(sign(scen.df$DeltaDelta)==0,
                                       "Current",""
                                       )))," Reopening")
-pdf(file=file.path(figuredir,paste0("FigS10_Scenarios_Results_All_",datadatemax,".pdf")),height=4,width=6)
+pdf(file=file.path(figuredir,paste0("FigS8_Scenarios_Results_All_",datadatemax,".pdf")),height=4,width=6)
 for (j in 1:nrow(scen.df)) {
   scenrow<-scen.df[j,]
   output <- run_setpoints(fips_table,

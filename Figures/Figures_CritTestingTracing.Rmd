@@ -1,7 +1,7 @@
 ---
 title: "Figures_CritTestingTracing"
 author: "Weihsueh Chiu"
-date: "7/31/2020"
+date: "`r format(Sys.time(), '%F')`"
 output:
   word_document: default
   html_document: default
@@ -234,10 +234,21 @@ dflabs<-c("Critical Testing Rate","Critical Tracing Fraction",
           "Critical Combined Testing Rate and Tracing Fraction")
 names(dflabs)<-c("lambdacrit","fCcrit","mubothcrit")
 
+# For proper calculation of boxplot whiskers
+tmpdf.df$value[is.infinite(tmpdf.df$value)] <- 1
+
+quantiles_95 <- function(x) {
+  r <- quantile(x, probs=c(0.025, 0.25, 0.5, 0.75, 0.975))
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+  r
+}
+
 ptesttrace<-ggplot(data=tmpdf.df,
        aes(x=state,
            y=value)) + 
-    geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
+    stat_summary(fun.data = quantiles_95, geom="boxplot",
+                 aes(fill=Category),outlier.shape = NA,position="dodge")+
+    #geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
   geom_point(aes(x=state,y=lambda,shape="Current Testing Rate (Median estimate)"),data=tmpdf2.df)+
   geom_point(aes(x=state,y=FTraced,shape="Current Fraction Traced (Median estimate)"),data=tmpdf2.df)+
   scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
@@ -252,8 +263,8 @@ ptesttrace<-ggplot(data=tmpdf.df,
   facet_wrap(~variable,ncol=1,
              labeller = labeller(variable=dflabs))
 print(ptesttrace)
-ggsave("FigS11_TestingTracing.2020.07.22.pdf",plot=ptesttrace,height=4,width=6,scale=1.75)
-ggsave("FigS11_TestingTracing.2020.07.22.jpeg",dpi=600,plot=ptesttrace,height=4,width=6,scale=1.75)
+ggsave("ExtDat_Fig3_TestingTracing.2020.07.22.pdf",plot=ptesttrace,height=4,width=6,scale=1.75)
+ggsave("ExtDat_Fig3_TestingTracing.2020.07.22.jpeg",dpi=600,plot=ptesttrace,height=4,width=6,scale=1.75)
 
 ```
 
@@ -349,11 +360,21 @@ dflabs<-c("Critical Testing Rate","Critical Tracing Fraction",
           "Critical Combined Testing Rate and Tracing Fraction")
 names(dflabs)<-c("lambdareopencrit","fCreopencrit","mubothreopencrit")
 
+# For proper calculation of boxplot whiskers
+tmpdf.df$value[is.infinite(tmpdf.df$value)] <- 1
+
+quantiles_95 <- function(x) {
+  r <- quantile(x, probs=c(0.025, 0.25, 0.5, 0.75, 0.975))
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+  r
+}
+
 preopentesttrace<-ggplot(data=tmpdf.df,
        aes(x=state,
            y=value)) + 
-    geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
-  geom_point(aes(x=state,y=lambda,shape="Current Testing Rate (Median estimate)"),data=tmpdf2.df)+
+#    geom_boxplot(aes(fill=Category),outlier.shape = NA,position="dodge")+
+    stat_summary(fun.data = quantiles_95, geom="boxplot",
+                 aes(fill=Category),outlier.shape = NA,position="dodge")+  geom_point(aes(x=state,y=lambda,shape="Current Testing Rate (Median estimate)"),data=tmpdf2.df)+
   geom_point(aes(x=state,y=FTraced,shape="Current Fraction Traced (Median estimate)"),data=tmpdf2.df)+
   scale_fill_viridis_d(begin=0.9,end=0.5,option="magma",
                        labels=list(bquote(R[eff](t)<1),
@@ -368,8 +389,8 @@ preopentesttrace<-ggplot(data=tmpdf.df,
              labeller = labeller(variable=dflabs))
 print(preopentesttrace)
 
-ggsave("FigS12_TestingTracingReopen.2020.07.22.pdf",plot=preopentesttrace,height=4,width=6,scale=1.75)
-ggsave("FigS12_TestingTracingReopen.2020.07.22.jpeg",dpi=600,plot=preopentesttrace,height=4,width=6,scale=1.75)
+ggsave("ExtDat_Fig4_TestingTracingReopen.2020.07.22.pdf",plot=preopentesttrace,height=4,width=6,scale=1.75)
+ggsave("ExtDat_Fig4_TestingTracingReopen.2020.07.22.jpeg",dpi=600,plot=preopentesttrace,height=4,width=6,scale=1.75)
 
 ```
 
@@ -437,6 +458,8 @@ tmpdf <- cbind(scenparms[,c("state","Rt","Refft","Category")],
 tmpdf.quantiles<-aggregate(.~state,data=tmpdf[,c("state","muCcrit","mulambdacrit","mubothcrit")],
                            quantile,prob=c(0.025,0.05,0.25,0.5,0.75,0.95,0.975))
 
+fwrite(as.data.table(tmpdf.quantiles),"Refft_TestTraceCritFoldChange.csv")
+
 tmpdf.df<-melt(as.data.table(tmpdf),id.vars=c("state","Category","Rt","Refft"),
             measure.vars = c("muCcrit","mulambdacrit","mubothcrit"))
 tmpdf.df$variable<-factor(tmpdf.df$variable,levels=c(
@@ -446,6 +469,7 @@ tmpdf.df$value[is.infinite(tmpdf.df$value)]<-1e6
 
 dflabs<-c("Increase Testing","Increase Tracing","Increase Testing and Tracing")
 names(dflabs)<-c("mulambdacrit","muCcrit","mubothcrit")
+
 
 ptesttrace<-ggplot(data=tmpdf.df,
        aes(x=state,
